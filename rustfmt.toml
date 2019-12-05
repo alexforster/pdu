@@ -1,0 +1,7 @@
+unstable_features = true
+
+max_width = 120
+comment_width = 120
+wrap_comments = true
+use_small_heuristics = "Max"
+fn_args_layout = "Compressed"

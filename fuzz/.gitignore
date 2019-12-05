@@ -1,0 +1,6 @@
+hfuzz_target/
+hfuzz_workspace/**/*
+!hfuzz_workspace/**/
+!hfuzz_workspace/ipv4/input/opts.honggfuzz.cov
+!hfuzz_workspace/ipv6/input/frag.honggfuzz.cov
+!hfuzz_workspace/tcp/input/sack.honggfuzz.cov

@@ -1,0 +1,30 @@
+[package]
+name = "pdu"
+version = "1.0.0-beta1"
+description = "Small, fast, and correct L2/L3/L4 packet parser."
+readme = "README.md"
+authors = ["Alex Forster <alex@alexforster.com>"]
+repository = "https://github.com/alexforster/pdu"
+homepage = "https://github.com/alexforster/pdu"
+keywords = ["ethernet", "ip", "tcp", "udp", "gre"]
+categories = ["parsing", "network-programming", "no-std"]
+license = "Apache-2.0"
+edition = "2018"
+
+[badges]
+travis-ci = { repository = "alexforster/pdu" }
+maintenance = { status = "passively-maintained" }
+
+[features]
+default = ["std"]
+std = []
+
+[dev-dependencies]
+base16 = { version = "~0.2" }
+roxmltree = { version = "~0.7" }
+pcap = { version = "~0.7" }
+
+[workspace]
+members = [
+    "fuzz"
+]
