@@ -56,6 +56,6 @@ impl<'a> IcmpPdu<'a> {
     }
 
     pub fn message(&'a self) -> &'a [u8] {
-        &self.buffer[8..]
+        &self.buffer[4..]
     }
 }
