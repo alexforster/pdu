@@ -37,10 +37,10 @@ pub fn fuzz(data: &[u8]) {
             ipv6_pdu.destination_address();
             for extension_header in ipv6_pdu.extension_headers() {
                 match extension_header {
-                    Ipv6ExtensionHeader::Raw { header, data } => {
+                    Ipv6ExtensionHeader::Raw { .. } => {
                         continue;
                     }
-                    Ipv6ExtensionHeader::Fragment { identification, offset, more_fragments } => {
+                    Ipv6ExtensionHeader::Fragment { .. } => {
                         continue;
                     }
                 }

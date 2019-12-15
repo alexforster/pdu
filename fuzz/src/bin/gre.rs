@@ -25,6 +25,7 @@ pub fn fuzz(data: &[u8]) {
             gre_pdu.version();
             gre_pdu.ethertype();
             gre_pdu.checksum();
+            gre_pdu.computed_checksum();
             gre_pdu.key();
             gre_pdu.sequence_number();
         }

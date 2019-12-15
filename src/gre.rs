@@ -16,7 +16,7 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
-use crate::{Error, Result};
+use crate::{util, Error, Result};
 
 /// Represents a GRE header and payload
 #[derive(Debug, Copy, Clone)]
@@ -108,6 +108,14 @@ impl<'a> GrePdu<'a> {
     pub fn checksum(&'a self) -> Option<u16> {
         if self.has_checksum() {
             Some(u16::from_be_bytes([self.buffer[4], self.buffer[5]]))
+        } else {
+            None
+        }
+    }
+
+    pub fn computed_checksum(&'a self) -> Option<u16> {
+        if self.has_checksum() {
+            Some(util::checksum(&[&self.buffer[0..=3], &self.buffer[6..]]))
         } else {
             None
         }

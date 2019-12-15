@@ -39,28 +39,45 @@ pub fn fuzz(data: &[u8]) {
             tcp_pdu.window_size();
             tcp_pdu.computed_window_size();
             tcp_pdu.checksum();
+            let ip = Ip::Ipv4(
+                Ipv4Pdu::new(&[
+                    0x45u8, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00,
+                ])
+                .unwrap(),
+            );
+            tcp_pdu.computed_checksum(&ip);
+            let ip = Ip::Ipv6(
+                Ipv6Pdu::new(&[
+                    0x60u8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                ])
+                .unwrap(),
+            );
+            tcp_pdu.computed_checksum(&ip);
             tcp_pdu.urgent_pointer();
             for option in tcp_pdu.options() {
                 match option {
-                    TcpOption::Raw { option, data } => {
+                    TcpOption::Raw { .. } => {
                         continue;
                     }
                     TcpOption::NoOp => {
                         continue;
                     }
-                    TcpOption::Mss(mss) => {
+                    TcpOption::Mss { .. } => {
                         continue;
                     }
-                    TcpOption::WindowScale(wscale) => {
+                    TcpOption::WindowScale { .. } => {
                         continue;
                     }
                     TcpOption::SackPermitted => {
                         continue;
                     }
-                    TcpOption::Sack(blocks) => {
+                    TcpOption::Sack { .. } => {
                         continue;
                     }
-                    TcpOption::Timestamp { val, ecr } => {
+                    TcpOption::Timestamp { .. } => {
                         continue;
                     }
                 }

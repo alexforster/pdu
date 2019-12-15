@@ -34,11 +34,12 @@ pub fn fuzz(data: &[u8]) {
             ipv4_pdu.ttl();
             ipv4_pdu.protocol();
             ipv4_pdu.checksum();
+            ipv4_pdu.computed_checksum();
             ipv4_pdu.source_address();
             ipv4_pdu.destination_address();
             for option in ipv4_pdu.options() {
                 match option {
-                    Ipv4Option::Raw { option, data } => {
+                    Ipv4Option::Raw { .. } => {
                         continue;
                     }
                 }

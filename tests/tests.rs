@@ -65,7 +65,23 @@ fn descendant_value(node: &xml::Node, proto: &str, field: &str, length: usize) -
     let value = if let Some(value) = descendant.attribute("value") {
         value
     } else {
-        return Err(format!("{}.{} has no value", proto, field).into());
+        return Err(format!("{}.{} has no 'value' attribute", proto, field).into());
+    };
+    Ok(hex_decode(length, value))
+}
+
+fn descendant_show(node: &xml::Node, proto: &str, field: &str, length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+    let descendant = node.descendants().find(|n| n.attribute("name") == Some(format!("{}.{}", proto, field).as_str()));
+    //eprintln!("{}.{} = {:?}", proto, field, descendant);
+    let descendant = if let Some(descendant) = descendant {
+        descendant
+    } else {
+        return Err(format!("{}.{} not found", proto, field).into());
+    };
+    let value = if let Some(value) = descendant.attribute("show") {
+        value
+    } else {
+        return Err(format!("{}.{} has no 'show' attribute", proto, field).into());
     };
     Ok(hex_decode(length, value))
 }
@@ -146,6 +162,9 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     assert_eq!(pdu.ttl().to_be_bytes(), descendant_value(&node, "ip", "ttl", 1)?.as_slice());
     assert_eq!(pdu.protocol().to_be_bytes(), descendant_value(&node, "ip", "proto", 1)?.as_slice());
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "ip", "checksum", 2)?.as_slice());
+    if descendant_show(&node, "ip", "checksum.status", 1)?.eq(&[0x01]) {
+        assert_eq!(pdu.computed_checksum().to_be_bytes(), descendant_value(&node, "ip", "checksum", 2)?.as_slice());
+    }
     assert_eq!(pdu.source_address().as_ref(), descendant_value(&node, "ip", "src", 4)?.as_slice());
     assert_eq!(pdu.destination_address().as_ref(), descendant_value(&node, "ip", "dst", 4)?.as_slice());
 
@@ -168,9 +187,9 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     match pdu.inner() {
         Ok(ipv4) => match ipv4 {
             Ipv4::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
-            Ipv4::Tcp(tcp_pdu) => visit_tcp_pdu(&tcp_pdu, nodes),
-            Ipv4::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, nodes),
-            Ipv4::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, nodes),
+            Ipv4::Tcp(tcp_pdu) => visit_tcp_pdu(&tcp_pdu, &Ip::Ipv4(*pdu), nodes),
+            Ipv4::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv4(*pdu), nodes),
+            Ipv4::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Gre(gre_pdu) => visit_gre_pdu(&gre_pdu, nodes),
         },
         Err(e) => Err(e.into()),
@@ -212,16 +231,16 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     match pdu.inner() {
         Ok(ipv6) => match ipv6 {
             Ipv6::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
-            Ipv6::Tcp(tcp_pdu) => visit_tcp_pdu(&tcp_pdu, nodes),
-            Ipv6::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, nodes),
-            Ipv6::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, nodes),
+            Ipv6::Tcp(tcp_pdu) => visit_tcp_pdu(&tcp_pdu, &Ip::Ipv6(*pdu), nodes),
+            Ipv6::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv6(*pdu), nodes),
+            Ipv6::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Gre(gre_pdu) => visit_gre_pdu(&gre_pdu, nodes),
         },
         Err(e) => Err(e.into()),
     }
 }
 
-fn visit_tcp_pdu(pdu: &TcpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -245,7 +264,12 @@ fn visit_tcp_pdu(pdu: &TcpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box
     assert_eq!(pdu.window_size().to_be_bytes(), descendant_value(&node, "tcp", "window_size_value", 2)?.as_slice());
     //assert_eq!(pdu.computed_window_size().to_be_bytes(), descendant_value(&node, "tcp", "window_size", 4)?.as_slice()); // wireshark tcp.window_size[value] is incorrect
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "tcp", "checksum", 2)?.as_slice());
-    assert_eq!(pdu.urgent_pointer().to_be_bytes(), descendant_value(&node, "tcp", "urgent_pointer", 2)?.as_slice());
+    if descendant_show(&node, "tcp", "checksum.status", 1)?.eq(&[0x01]) {
+        assert_eq!(
+            pdu.computed_checksum(&ip_pdu).to_be_bytes(),
+            descendant_value(&node, "tcp", "checksum", 2)?.as_slice()
+        );
+    }
 
     let mut options = pdu.options().collect::<VecDeque<TcpOption>>();
 
@@ -315,7 +339,7 @@ fn visit_tcp_pdu(pdu: &TcpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box
     Ok(())
 }
 
-fn visit_udp_pdu(pdu: &UdpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -326,11 +350,17 @@ fn visit_udp_pdu(pdu: &UdpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box
     assert_eq!(pdu.destination_port().to_be_bytes(), descendant_value(&node, "udp", "dstport", 2)?.as_slice());
     assert_eq!(pdu.length().to_be_bytes(), descendant_value(&node, "udp", "length", 2)?.as_slice());
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "udp", "checksum", 2)?.as_slice());
+    if descendant_show(&node, "udp", "checksum.status", 1)?.eq(&[0x01]) {
+        assert_eq!(
+            pdu.computed_checksum(&ip_pdu).to_be_bytes(),
+            descendant_value(&node, "udp", "checksum", 2)?.as_slice()
+        );
+    }
 
     Ok(())
 }
 
-fn visit_icmp_pdu(pdu: &IcmpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -345,6 +375,12 @@ fn visit_icmp_pdu(pdu: &IcmpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     assert_eq!(pdu.message_type().to_be_bytes(), descendant_value(&node, proto, "type", 1)?.as_slice());
     assert_eq!(pdu.message_code().to_be_bytes(), descendant_value(&node, proto, "code", 1)?.as_slice());
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, proto, "checksum", 2)?.as_slice());
+    if descendant_show(&node, proto, "checksum.status", 1)?.eq(&[0x01]) {
+        assert_eq!(
+            pdu.computed_checksum(&ip_pdu).to_be_bytes(),
+            descendant_value(&node, proto, "checksum", 2)?.as_slice()
+        );
+    }
 
     Ok(())
 }
@@ -361,6 +397,12 @@ fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box
 
     if node.descendants().any(|n| n.attribute("name") == Some("gre.checksum")) {
         assert_eq!(pdu.checksum().unwrap().to_be_bytes(), descendant_value(&node, "gre", "checksum", 2)?.as_slice());
+        if descendant_show(&node, "gre", "checksum.status", 1)?.eq(&[0x01]) {
+            assert_eq!(
+                pdu.computed_checksum().unwrap().to_be_bytes(),
+                descendant_value(&node, "gre", "checksum", 2)?.as_slice()
+            );
+        }
     }
 
     if node.descendants().any(|n| n.attribute("name") == Some("gre.key")) {
@@ -396,8 +438,8 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
         .filter(|f| f.path().is_file() && f.path().extension().unwrap_or_else(|| ffi::OsStr::new("")) == "pcap")
         .collect::<Vec<fs::DirEntry>>();
 
-    for pcap in pcap_files.iter() {
-        let pcap_path = pcap.path().to_str().unwrap().to_string();
+    for pcap_file in pcap_files.iter() {
+        let pcap_file = pcap_file.path().to_str().unwrap().to_string();
         let mut tshark = Command::new("tshark");
         tshark.args(&[
             "-n",
@@ -410,13 +452,13 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
             "-T",
             "pdml",
             "-r",
-            &pcap_path,
+            &pcap_file,
         ]);
         tshark.stdout(Stdio::piped());
 
         let output = tshark.output()?;
         if !output.status.success() {
-            eprintln!("[{}] tshark error: {:?}", pcap_path, output);
+            eprintln!("[{}] tshark error: {:?}", pcap_file, output);
             continue;
         }
 
@@ -425,10 +467,10 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
         let dissections: Vec<xml::Node> =
             dissections.root().first_element_child().unwrap().children().filter(|n| n.is_element()).collect();
 
-        let mut pcap = match pcap::Capture::from_file(pcap.path().to_str().unwrap()) {
+        let mut pcap = match pcap::Capture::from_file(&pcap_file) {
             Ok(pcap) => pcap,
             Err(e) => {
-                eprintln!("[{}] pcap error: {:?}", pcap_path, e);
+                eprintln!("[{}] pcap error: {:?}", &pcap_file, e);
                 continue;
             }
         };
@@ -445,22 +487,23 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
                 .collect();
 
             if dissections.is_empty() {
-                eprintln!("[{}] empty", pcap_path);
+                eprintln!("[{}] empty", &pcap_file);
                 continue;
             }
 
+            //eprintln!("{} (#{})", &pcap_file, i + 1);
             let first_layer = dissections.front().unwrap().attribute("name");
             if first_layer == Some("eth") {
                 match EthernetPdu::new(&data) {
                     Ok(ethernet_pdu) => match visit_ethernet_pdu(&ethernet_pdu, dissections) {
                         Ok(()) => {}
                         Err(e) => {
-                            eprintln!("[{}#{}] validate error: {:?}", pcap_path, i, e);
+                            eprintln!("[{}#{}] validate error: {:?}", &pcap_file, i + 1, e);
                             continue;
                         }
                     },
                     Err(e) => {
-                        eprintln!("[{}#{}] decode error: {:?}", pcap_path, i, e);
+                        eprintln!("[{}#{}] decode error: {:?}", &pcap_file, i + 1, e);
                         continue;
                     }
                 }
@@ -469,24 +512,24 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
                     Ok(Ip::Ipv4(ipv4_pdu)) => match visit_ipv4_pdu(&ipv4_pdu, dissections) {
                         Ok(()) => {}
                         Err(e) => {
-                            eprintln!("[{}#{}] validate error: {:?}", pcap_path, i, e);
+                            eprintln!("[{}#{}] validate error: {:?}", &pcap_file, i + 1, e);
                             continue;
                         }
                     },
                     Ok(Ip::Ipv6(ipv6_pdu)) => match visit_ipv6_pdu(&ipv6_pdu, dissections) {
                         Ok(()) => {}
                         Err(e) => {
-                            eprintln!("[{}#{}] validate error: {:?}", pcap_path, i, e);
+                            eprintln!("[{}#{}] validate error: {:?}", &pcap_file, i + 1, e);
                             continue;
                         }
                     },
                     Err(e) => {
-                        eprintln!("[{}#{}] decode error: {:?}", pcap_path, i, e);
+                        eprintln!("[{}#{}] decode error: {:?}", &pcap_file, i + 1, e);
                         continue;
                     }
                 }
             } else {
-                eprintln!("[{}] unsupported first layer ({:?})", pcap_path, first_layer);
+                eprintln!("[{}] unsupported first layer ({:?})", &pcap_file, first_layer);
                 continue;
             }
         }

@@ -16,7 +16,7 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
-use crate::{Error, Result};
+use crate::{util, Error, Result};
 
 /// Provides constants representing various IP protocol numbers supported by this crate
 #[allow(non_snake_case)]
@@ -193,6 +193,10 @@ impl<'a> Ipv4Pdu<'a> {
 
     pub fn checksum(&'a self) -> u16 {
         u16::from_be_bytes([self.buffer[10], self.buffer[11]])
+    }
+
+    pub fn computed_checksum(&'a self) -> u16 {
+        util::checksum(&[&self.buffer[0..=9], &self.buffer[12..self.computed_ihl()]])
     }
 
     pub fn source_address(&'a self) -> [u8; 4] {

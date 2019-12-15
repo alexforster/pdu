@@ -41,6 +41,8 @@ pub use icmp::IcmpPdu;
 mod gre;
 pub use gre::{Gre, GrePdu};
 
+mod util;
+
 /// Defines the set of possible errors returned by packet parsers in this crate
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Error {

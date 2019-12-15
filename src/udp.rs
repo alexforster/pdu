@@ -16,7 +16,7 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
-use crate::{Error, Result};
+use crate::{util, Error, Result};
 
 /// Represents a UDP header and payload
 #[derive(Debug, Copy, Clone)]
@@ -69,5 +69,26 @@ impl<'a> UdpPdu<'a> {
 
     pub fn checksum(&'a self) -> u16 {
         u16::from_be_bytes([self.buffer[6], self.buffer[7]])
+    }
+
+    pub fn computed_checksum(&'a self, ip: &crate::Ip) -> u16 {
+        match ip {
+            crate::Ip::Ipv4(ipv4) => util::checksum(&[
+                &ipv4.source_address().as_ref(),
+                &ipv4.destination_address().as_ref(),
+                &[0x00, ipv4.protocol()].as_ref(),
+                &self.length().to_be_bytes().as_ref(),
+                &self.buffer[0..=5],
+                &self.buffer[8..],
+            ]),
+            crate::Ip::Ipv6(ipv6) => util::checksum(&[
+                &ipv6.source_address().as_ref(),
+                &ipv6.destination_address().as_ref(),
+                &(self.length() as u32).to_be_bytes().as_ref(),
+                &[0x0, 0x0, 0x0, ipv6.computed_protocol()].as_ref(),
+                &self.buffer[0..=5],
+                &self.buffer[8..],
+            ]),
+        }
     }
 }
