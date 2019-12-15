@@ -16,7 +16,7 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
-//! Small, fast, and correct L2/L3/L4 packet parser.
+//! Small, fast, and correct L2/L3/L4 packet parser
 
 #![cfg_attr(not(any(feature = "std", test)), no_std)]
 

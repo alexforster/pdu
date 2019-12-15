@@ -36,6 +36,7 @@ pub enum Ip<'a> {
 }
 
 impl<'a> Ip<'a> {
+    /// Constructs either an [`Ipv4Pdu`] or [`Ipv6Pdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         if buffer.is_empty() {
             return Err(Error::Truncated);
@@ -54,7 +55,7 @@ pub struct Ipv4Pdu<'a> {
     buffer: &'a [u8],
 }
 
-/// Represents the payload of an [`Ipv4Pdu`]
+/// Contains the inner payload of an [`Ipv4Pdu`]
 #[derive(Debug, Copy, Clone)]
 pub enum Ipv4<'a> {
     Raw(&'a [u8]),
@@ -65,6 +66,7 @@ pub enum Ipv4<'a> {
 }
 
 impl<'a> Ipv4Pdu<'a> {
+    /// Constructs an [`Ipv4Pdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         let pdu = Ipv4Pdu { buffer };
         if buffer.len() < 20 || buffer.len() < pdu.computed_ihl() {
@@ -102,16 +104,19 @@ impl<'a> Ipv4Pdu<'a> {
         Ok(pdu)
     }
 
+    /// Returns a reference to the entire underlying buffer that was provided during construction
     pub fn buffer(&'a self) -> &'a [u8] {
         self.buffer
     }
 
+    /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         &self.buffer[0..self.computed_ihl()]
     }
 
+    /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Ipv4<'a>> {
-        let rest = &self.buffer[self.computed_ihl() as usize..];
+        let rest = &self.buffer[self.computed_ihl()..];
 
         if self.fragment_offset() > 0 {
             Ok(Ipv4::Raw(rest))
@@ -239,7 +244,7 @@ pub struct Ipv6Pdu<'a> {
     buffer: &'a [u8],
 }
 
-/// Represents the payload of an [`Ipv6Pdu`]
+/// Contains the inner payload of an [`Ipv6Pdu`]
 #[derive(Debug, Copy, Clone)]
 pub enum Ipv6<'a> {
     Raw(&'a [u8]),
@@ -250,6 +255,7 @@ pub enum Ipv6<'a> {
 }
 
 impl<'a> Ipv6Pdu<'a> {
+    /// Constructs an [`Ipv6Pdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         let pdu = Ipv6Pdu { buffer };
         if buffer.len() < 40 {
@@ -276,14 +282,17 @@ impl<'a> Ipv6Pdu<'a> {
         Ok(pdu)
     }
 
+    /// Returns a reference to the entire underlying buffer that was provided during construction
     pub fn buffer(&'a self) -> &'a [u8] {
         self.buffer
     }
 
+    /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         &self.buffer[0..self.computed_ihl()]
     }
 
+    /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Ipv6<'a>> {
         let rest = &self.buffer[self.computed_ihl()..];
 

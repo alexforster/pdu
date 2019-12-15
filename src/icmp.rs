@@ -25,6 +25,7 @@ pub struct IcmpPdu<'a> {
 }
 
 impl<'a> IcmpPdu<'a> {
+    /// Constructs a [`IcmpPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         if buffer.len() < 8 {
             return Err(Error::Truncated);
@@ -32,10 +33,12 @@ impl<'a> IcmpPdu<'a> {
         Ok(IcmpPdu { buffer })
     }
 
+    /// Returns a reference to the entire underlying buffer that was provided during construction
     pub fn buffer(&'a self) -> &'a [u8] {
         self.buffer
     }
 
+    /// Returns the slice of the underlying buffer that contains this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         &self.buffer[0..8]
     }

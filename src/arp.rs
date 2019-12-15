@@ -25,6 +25,7 @@ pub struct ArpPdu<'a> {
 }
 
 impl<'a> ArpPdu<'a> {
+    /// Constructs an [`ArpPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         if buffer.len() < 12 {
             return Err(Error::Truncated);
@@ -43,10 +44,12 @@ impl<'a> ArpPdu<'a> {
         Ok(ArpPdu { buffer })
     }
 
+    /// Returns a reference to the entire underlying buffer that was provided during construction
     pub fn buffer(&'a self) -> &'a [u8] {
         self.buffer
     }
 
+    /// Returns the slice of the underlying buffer that contains this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         &self.buffer[0..28]
     }

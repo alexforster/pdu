@@ -18,7 +18,7 @@
 
 use crate::{Error, Result};
 
-/// Provides constants representing TCP bitflags
+/// Provides constants representing the set of TCP bitflags
 #[allow(non_snake_case)]
 pub mod TcpFlag {
     pub const FIN: u8 = 1;
@@ -37,13 +37,14 @@ pub struct TcpPdu<'a> {
     buffer: &'a [u8],
 }
 
-/// Represents the payload of a [`TcpPdu`]
+/// Contains the inner payload of a [`TcpPdu`]
 #[derive(Debug, Copy, Clone)]
 pub enum Tcp<'a> {
     Raw(&'a [u8]),
 }
 
 impl<'a> TcpPdu<'a> {
+    /// Constructs a [`TcpPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         let pdu = TcpPdu { buffer };
         if buffer.len() < 20 || buffer.len() < pdu.computed_data_offset() {
@@ -78,14 +79,17 @@ impl<'a> TcpPdu<'a> {
         Ok(pdu)
     }
 
+    /// Returns a reference to the entire underlying buffer that was provided during construction
     pub fn buffer(&'a self) -> &'a [u8] {
         self.buffer
     }
 
+    /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         &self.buffer[0..self.computed_data_offset()]
     }
 
+    /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Tcp<'a>> {
         Ok(Tcp::Raw(&self.buffer[self.computed_data_offset()..]))
     }

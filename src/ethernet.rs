@@ -34,7 +34,7 @@ pub struct EthernetPdu<'a> {
     buffer: &'a [u8],
 }
 
-/// Represents the payload of an [`EthernetPdu`]
+/// Contains the inner payload of an [`EthernetPdu`]
 #[derive(Debug, Copy, Clone)]
 pub enum Ethernet<'a> {
     Raw(&'a [u8]),
@@ -44,6 +44,7 @@ pub enum Ethernet<'a> {
 }
 
 impl<'a> EthernetPdu<'a> {
+    /// Constructs an [`EthernetPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         if buffer.len() < 14 {
             return Err(Error::Truncated);
@@ -59,21 +60,17 @@ impl<'a> EthernetPdu<'a> {
         Ok(pdu)
     }
 
+    /// Returns a reference to the entire underlying buffer that was provided during construction
     pub fn buffer(&'a self) -> &'a [u8] {
         self.buffer
     }
 
+    /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         &self.buffer[0..self.computed_ihl()]
     }
 
-    pub fn computed_ihl(&'a self) -> usize {
-        match self.tpid() {
-            EtherType::DOT1Q => 18,
-            _ => 14,
-        }
-    }
-
+    /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Ethernet<'a>> {
         let rest = &self.buffer[self.computed_ihl()..];
         Ok(match self.ethertype() {
@@ -82,6 +79,13 @@ impl<'a> EthernetPdu<'a> {
             EtherType::IPV6 => Ethernet::Ipv6(super::Ipv6Pdu::new(rest)?),
             _ => Ethernet::Raw(rest),
         })
+    }
+
+    pub fn computed_ihl(&'a self) -> usize {
+        match self.tpid() {
+            EtherType::DOT1Q => 18,
+            _ => 14,
+        }
     }
 
     pub fn source_address(&'a self) -> [u8; 6] {

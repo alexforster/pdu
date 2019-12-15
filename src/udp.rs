@@ -24,13 +24,14 @@ pub struct UdpPdu<'a> {
     buffer: &'a [u8],
 }
 
-/// Represents the payload of a [`UdpPdu`]
+/// Contains the inner payload of a [`UdpPdu`]
 #[derive(Debug, Copy, Clone)]
 pub enum Udp<'a> {
     Raw(&'a [u8]),
 }
 
 impl<'a> UdpPdu<'a> {
+    /// Constructs a [`UdpPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         if buffer.len() < 8 {
             return Err(Error::Truncated);
@@ -38,14 +39,17 @@ impl<'a> UdpPdu<'a> {
         Ok(UdpPdu { buffer })
     }
 
+    /// Returns a reference to the entire underlying buffer that was provided during construction
     pub fn buffer(&'a self) -> &'a [u8] {
         self.buffer
     }
 
+    /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         &self.buffer[0..8]
     }
 
+    /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Udp<'a>> {
         Ok(Udp::Raw(&self.buffer[8..]))
     }

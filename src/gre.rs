@@ -18,13 +18,13 @@
 
 use crate::{Error, Result};
 
-/// Represents a GREv0 header and payload
+/// Represents a GRE header and payload
 #[derive(Debug, Copy, Clone)]
 pub struct GrePdu<'a> {
     buffer: &'a [u8],
 }
 
-/// Represents the payload of a [`GrePdu`]
+/// Contains the inner payload of a [`GrePdu`]
 #[derive(Debug, Copy, Clone)]
 pub enum Gre<'a> {
     Raw(&'a [u8]),
@@ -34,6 +34,7 @@ pub enum Gre<'a> {
 }
 
 impl<'a> GrePdu<'a> {
+    /// Constructs a [`GrePdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         if buffer.len() < 4 {
             return Err(Error::Truncated);
@@ -49,14 +50,17 @@ impl<'a> GrePdu<'a> {
         Ok(pdu)
     }
 
+    /// Returns a reference to the entire underlying buffer that was provided during construction
     pub fn buffer(&'a self) -> &'a [u8] {
         self.buffer
     }
 
+    /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         &self.buffer[0..self.computed_ihl()]
     }
 
+    /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Gre<'a>> {
         let rest = &self.buffer[self.computed_ihl()..];
         Ok(match self.ethertype() {
