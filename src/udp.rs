@@ -33,10 +33,11 @@ pub enum Udp<'a> {
 impl<'a> UdpPdu<'a> {
     /// Constructs a [`UdpPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
-        if buffer.len() < 8 {
+        let pdu = UdpPdu { buffer };
+        if buffer.len() < 8 || (pdu.length() as usize) < buffer.len() {
             return Err(Error::Truncated);
         }
-        Ok(UdpPdu { buffer })
+        Ok(pdu)
     }
 
     /// Returns a reference to the entire underlying buffer that was provided during construction

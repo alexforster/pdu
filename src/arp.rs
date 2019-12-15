@@ -30,18 +30,19 @@ impl<'a> ArpPdu<'a> {
         if buffer.len() < 12 {
             return Err(Error::Truncated);
         }
-        if buffer[4] != 6 {
+        let pdu = ArpPdu { buffer };
+        if pdu.hardware_length() != 6 {
             // we only support 6-octet hardware addresses
             return Err(Error::Malformed);
         }
-        if buffer[5] != 4 {
+        if pdu.protocol_length() != 4 {
             // we only support 4-octet protocol addresses
             return Err(Error::Malformed);
         }
         if buffer.len() < 28 {
             return Err(Error::Truncated);
         }
-        Ok(ArpPdu { buffer })
+        Ok(pdu)
     }
 
     /// Returns a reference to the entire underlying buffer that was provided during construction

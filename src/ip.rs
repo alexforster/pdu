@@ -69,8 +69,14 @@ impl<'a> Ipv4Pdu<'a> {
     /// Constructs an [`Ipv4Pdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         let pdu = Ipv4Pdu { buffer };
-        if buffer.len() < 20 || buffer.len() < pdu.computed_ihl() {
+        if buffer.len() < 20 || pdu.computed_ihl() < 20 {
             return Err(Error::Truncated);
+        }
+        if buffer.len() < (pdu.computed_ihl() as usize)
+            || buffer.len() < (pdu.total_length() as usize)
+            || (pdu.total_length() as usize) < pdu.computed_ihl()
+        {
+            return Err(Error::Malformed);
         }
         if pdu.version() != 4 {
             return Err(Error::Malformed);
