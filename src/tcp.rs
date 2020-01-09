@@ -16,6 +16,8 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
+use core::convert::TryInto;
+
 use crate::{util, Error, Result};
 
 /// Provides constants representing the set of TCP bitflags
@@ -204,7 +206,7 @@ pub enum TcpOption<'a> {
     Mss { size: u16 },
     WindowScale { shift: u8 },
     SackPermitted,
-    Sack { blocks: &'a [u8] },
+    Sack { blocks: [Option<(u32, u32)>; 4] },
     Timestamp { val: u32, ecr: u32 },
 }
 
@@ -245,7 +247,6 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
                     }
                 }
                 4 => Some(TcpOption::SackPermitted),
-                5 => Some(TcpOption::Sack { blocks: &self.buffer[(pos + 2)..(pos + len)] }),
                 8 => {
                     if len < 10 {
                         None
@@ -266,6 +267,68 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
                         })
                     }
                 }
+                5 if len == 10 => Some(TcpOption::Sack {
+                    blocks: [
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
+                        )),
+                        None,
+                        None,
+                        None,
+                    ],
+                }),
+                5 if len == 18 => Some(TcpOption::Sack {
+                    blocks: [
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
+                        )),
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 10..=pos + 13].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 14..=pos + 17].try_into().unwrap()),
+                        )),
+                        None,
+                        None,
+                    ],
+                }),
+                5 if len == 26 => Some(TcpOption::Sack {
+                    blocks: [
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
+                        )),
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 10..=pos + 13].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 14..=pos + 17].try_into().unwrap()),
+                        )),
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 18..=pos + 21].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 22..=pos + 25].try_into().unwrap()),
+                        )),
+                        None,
+                    ],
+                }),
+                5 if len == 34 => Some(TcpOption::Sack {
+                    blocks: [
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
+                        )),
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 10..=pos + 13].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 14..=pos + 17].try_into().unwrap()),
+                        )),
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 18..=pos + 21].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 22..=pos + 25].try_into().unwrap()),
+                        )),
+                        Some((
+                            u32::from_be_bytes(self.buffer[pos + 26..=pos + 29].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 30..=pos + 33].try_into().unwrap()),
+                        )),
+                    ],
+                }),
                 _ => Some(TcpOption::Raw { option, data: &self.buffer[pos..(pos + len)] }),
             }
         } else {

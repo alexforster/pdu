@@ -311,9 +311,24 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
             }
             "tcp.options.sack" => {
                 if let Some(TcpOption::Sack { blocks }) = options.pop_front() {
-                    assert_eq!(blocks, &descendant_value(&node, "tcp", "options.sack", 0)?.as_slice()[2..]);
+                    match blocks {
+                        [Some((l, r)), None, None, None]
+                        | [Some((l, _)), Some((_, r)), None, None]
+                        | [Some((l, _)), Some((_, _)), Some((_, r)), None]
+                        | [Some((l, _)), Some((_, _)), Some((_, _)), Some((_, r))] => {
+                            assert_eq!(
+                                &l.to_be_bytes(),
+                                descendant_value(&node, "tcp", "options.sack_le", 4)?.as_slice()
+                            );
+                            assert_eq!(
+                                &r.to_be_bytes(),
+                                descendant_value(&node, "tcp", "options.sack_re", 4)?.as_slice()
+                            );
+                        }
+                        _ => panic!("TcpOption::Sack blocks are [None, None, None, None]"),
+                    }
                 } else {
-                    panic!("expected TcpOption::Raw");
+                    panic!("expected TcpOption::Sack");
                 }
             }
             "tcp.options.timestamp" => {
