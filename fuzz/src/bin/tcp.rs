@@ -37,7 +37,7 @@ pub fn fuzz(data: &[u8]) {
             tcp_pdu.ecn();
             tcp_pdu.cwr();
             tcp_pdu.window_size();
-            tcp_pdu.computed_window_size();
+            tcp_pdu.computed_window_size(14);
             tcp_pdu.checksum();
             let ip = Ip::Ipv4(
                 Ipv4Pdu::new(&[
