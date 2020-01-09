@@ -97,19 +97,19 @@ impl<'a> TcpPdu<'a> {
     }
 
     pub fn source_port(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[0], self.buffer[1]])
+        u16::from_be_bytes(self.buffer[0..=1].try_into().unwrap())
     }
 
     pub fn destination_port(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[2], self.buffer[3]])
+        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
     }
 
     pub fn sequence_number(&'a self) -> u32 {
-        u32::from_be_bytes([self.buffer[4], self.buffer[5], self.buffer[6], self.buffer[7]])
+        u32::from_be_bytes(self.buffer[4..=7].try_into().unwrap())
     }
 
     pub fn acknowledgement_number(&'a self) -> u32 {
-        u32::from_be_bytes([self.buffer[8], self.buffer[9], self.buffer[10], self.buffer[11]])
+        u32::from_be_bytes(self.buffer[8..=11].try_into().unwrap())
     }
 
     pub fn data_offset(&'a self) -> u8 {
@@ -157,7 +157,7 @@ impl<'a> TcpPdu<'a> {
     }
 
     pub fn window_size(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[14], self.buffer[15]])
+        u16::from_be_bytes(self.buffer[14..=15].try_into().unwrap())
     }
 
     pub fn computed_window_size(&'a self, shift: u8) -> u32 {
@@ -165,7 +165,7 @@ impl<'a> TcpPdu<'a> {
     }
 
     pub fn checksum(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[16], self.buffer[17]])
+        u16::from_be_bytes(self.buffer[16..=17].try_into().unwrap())
     }
 
     pub fn computed_checksum(&'a self, ip: &crate::Ip) -> u16 {
@@ -190,7 +190,7 @@ impl<'a> TcpPdu<'a> {
     }
 
     pub fn urgent_pointer(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[18], self.buffer[19]])
+        u16::from_be_bytes(self.buffer[18..=19].try_into().unwrap())
     }
 
     pub fn options(&'a self) -> TcpOptionIterator<'a> {
@@ -232,41 +232,11 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
             match option {
                 0 => None,
                 1 => Some(TcpOption::NoOp),
-                2 => {
-                    if len < 4 {
-                        None
-                    } else {
-                        Some(TcpOption::Mss { size: u16::from_be_bytes([self.buffer[pos + 2], self.buffer[pos + 3]]) })
-                    }
-                }
-                3 => {
-                    if len < 3 {
-                        None
-                    } else {
-                        Some(TcpOption::WindowScale { shift: self.buffer[pos + 2] })
-                    }
-                }
+                2 if len == 4 => Some(TcpOption::Mss {
+                    size: u16::from_be_bytes(self.buffer[pos + 2..=pos + 3].try_into().unwrap()),
+                }),
+                3 if len == 3 => Some(TcpOption::WindowScale { shift: self.buffer[pos + 2] }),
                 4 => Some(TcpOption::SackPermitted),
-                8 => {
-                    if len < 10 {
-                        None
-                    } else {
-                        Some(TcpOption::Timestamp {
-                            val: u32::from_be_bytes([
-                                self.buffer[pos + 2],
-                                self.buffer[pos + 3],
-                                self.buffer[pos + 4],
-                                self.buffer[pos + 5],
-                            ]),
-                            ecr: u32::from_be_bytes([
-                                self.buffer[pos + 6],
-                                self.buffer[pos + 7],
-                                self.buffer[pos + 8],
-                                self.buffer[pos + 9],
-                            ]),
-                        })
-                    }
-                }
                 5 if len == 10 => Some(TcpOption::Sack {
                     blocks: [
                         Some((
@@ -328,6 +298,10 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
                             u32::from_be_bytes(self.buffer[pos + 30..=pos + 33].try_into().unwrap()),
                         )),
                     ],
+                }),
+                8 if len == 10 => Some(TcpOption::Timestamp {
+                    val: u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
+                    ecr: u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
                 }),
                 _ => Some(TcpOption::Raw { option, data: &self.buffer[pos..(pos + len)] }),
             }

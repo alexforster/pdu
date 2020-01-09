@@ -16,6 +16,8 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
+use core::convert::TryInto;
+
 use crate::{util, Error, Result};
 
 /// Represents a GRE header and payload
@@ -90,7 +92,7 @@ impl<'a> GrePdu<'a> {
     }
 
     pub fn ethertype(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[2], self.buffer[3]])
+        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
     }
 
     pub fn has_checksum(&'a self) -> bool {
@@ -107,7 +109,7 @@ impl<'a> GrePdu<'a> {
 
     pub fn checksum(&'a self) -> Option<u16> {
         if self.has_checksum() {
-            Some(u16::from_be_bytes([self.buffer[4], self.buffer[5]]))
+            Some(u16::from_be_bytes(self.buffer[4..=5].try_into().unwrap()))
         } else {
             None
         }
@@ -123,9 +125,9 @@ impl<'a> GrePdu<'a> {
 
     pub fn key(&'a self) -> Option<u32> {
         if self.has_checksum() && self.has_key() {
-            Some(u32::from_be_bytes([self.buffer[8], self.buffer[9], self.buffer[10], self.buffer[11]]))
+            Some(u32::from_be_bytes(self.buffer[8..=11].try_into().unwrap()))
         } else if self.has_key() {
-            Some(u32::from_be_bytes([self.buffer[4], self.buffer[5], self.buffer[6], self.buffer[7]]))
+            Some(u32::from_be_bytes(self.buffer[4..=7].try_into().unwrap()))
         } else {
             None
         }
@@ -133,11 +135,11 @@ impl<'a> GrePdu<'a> {
 
     pub fn sequence_number(&'a self) -> Option<u32> {
         if self.has_sequence_number() && self.has_checksum() && self.has_key() {
-            Some(u32::from_be_bytes([self.buffer[12], self.buffer[13], self.buffer[14], self.buffer[15]]))
+            Some(u32::from_be_bytes(self.buffer[12..=15].try_into().unwrap()))
         } else if self.has_sequence_number() && (self.has_checksum() || self.has_key()) {
-            Some(u32::from_be_bytes([self.buffer[8], self.buffer[9], self.buffer[10], self.buffer[11]]))
+            Some(u32::from_be_bytes(self.buffer[8..=11].try_into().unwrap()))
         } else if self.has_sequence_number() {
-            Some(u32::from_be_bytes([self.buffer[4], self.buffer[5], self.buffer[6], self.buffer[7]]))
+            Some(u32::from_be_bytes(self.buffer[4..=7].try_into().unwrap()))
         } else {
             None
         }

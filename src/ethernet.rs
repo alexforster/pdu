@@ -16,6 +16,8 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
+use core::convert::TryInto;
+
 use crate::{Error, Result};
 
 /// Provides constants representing various EtherTypes supported by this crate
@@ -101,19 +103,19 @@ impl<'a> EthernetPdu<'a> {
     }
 
     pub fn tpid(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[12], self.buffer[13]])
+        u16::from_be_bytes(self.buffer[12..=13].try_into().unwrap())
     }
 
     pub fn ethertype(&'a self) -> u16 {
         match self.tpid() {
-            EtherType::DOT1Q => u16::from_be_bytes([self.buffer[16], self.buffer[17]]),
+            EtherType::DOT1Q => u16::from_be_bytes(self.buffer[16..=17].try_into().unwrap()),
             ethertype => ethertype,
         }
     }
 
     pub fn vlan(&'a self) -> Option<u16> {
         match self.tpid() {
-            EtherType::DOT1Q => Some(u16::from_be_bytes([self.buffer[14], self.buffer[15]]) & 0x0FFF),
+            EtherType::DOT1Q => Some(u16::from_be_bytes(self.buffer[14..=15].try_into().unwrap()) & 0x0FFF),
             _ => None,
         }
     }

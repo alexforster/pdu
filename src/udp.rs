@@ -16,6 +16,8 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
+use core::convert::TryInto;
+
 use crate::{util, Error, Result};
 
 /// Represents a UDP header and payload
@@ -56,19 +58,19 @@ impl<'a> UdpPdu<'a> {
     }
 
     pub fn source_port(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[0], self.buffer[1]])
+        u16::from_be_bytes(self.buffer[0..=1].try_into().unwrap())
     }
 
     pub fn destination_port(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[2], self.buffer[3]])
+        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
     }
 
     pub fn length(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[4], self.buffer[5]])
+        u16::from_be_bytes(self.buffer[4..=5].try_into().unwrap())
     }
 
     pub fn checksum(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[6], self.buffer[7]])
+        u16::from_be_bytes(self.buffer[6..=7].try_into().unwrap())
     }
 
     pub fn computed_checksum(&'a self, ip: &crate::Ip) -> u16 {

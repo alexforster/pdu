@@ -16,6 +16,8 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
+use core::convert::TryInto;
+
 use crate::{Error, Result};
 
 /// Represents an ARP payload
@@ -56,11 +58,11 @@ impl<'a> ArpPdu<'a> {
     }
 
     pub fn hardware_type(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[0], self.buffer[1]])
+        u16::from_be_bytes(self.buffer[0..=1].try_into().unwrap())
     }
 
     pub fn protocol_type(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[2], self.buffer[3]])
+        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
     }
 
     pub fn hardware_length(&'a self) -> u8 {
@@ -72,7 +74,7 @@ impl<'a> ArpPdu<'a> {
     }
 
     pub fn opcode(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[6], self.buffer[7]])
+        u16::from_be_bytes(self.buffer[6..=7].try_into().unwrap())
     }
 
     pub fn sender_hardware_address(&'a self) -> [u8; 6] {

@@ -16,6 +16,8 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
+use core::convert::TryInto;
+
 use crate::{util, Error, Result};
 
 /// Provides constants representing various IP protocol numbers supported by this crate
@@ -164,11 +166,11 @@ impl<'a> Ipv4Pdu<'a> {
     }
 
     pub fn total_length(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[2], self.buffer[3]])
+        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
     }
 
     pub fn identification(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[4], self.buffer[5]])
+        u16::from_be_bytes(self.buffer[4..=5].try_into().unwrap())
     }
 
     pub fn dont_fragment(&'a self) -> bool {
@@ -192,7 +194,7 @@ impl<'a> Ipv4Pdu<'a> {
     }
 
     pub fn checksum(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[10], self.buffer[11]])
+        u16::from_be_bytes(self.buffer[10..=11].try_into().unwrap())
     }
 
     pub fn computed_checksum(&'a self) -> u16 {
@@ -342,7 +344,7 @@ impl<'a> Ipv6Pdu<'a> {
     }
 
     pub fn payload_length(&'a self) -> u16 {
-        u16::from_be_bytes([self.buffer[4], self.buffer[5]])
+        u16::from_be_bytes(self.buffer[4..=5].try_into().unwrap())
     }
 
     pub fn next_header(&'a self) -> u8 {
