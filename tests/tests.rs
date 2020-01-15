@@ -262,7 +262,7 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
     assert_eq!((pdu.ecn() as u8).to_be_bytes(), descendant_value(&node, "tcp", "flags.ecn", 1)?.as_slice());
     assert_eq!((pdu.cwr() as u8).to_be_bytes(), descendant_value(&node, "tcp", "flags.cwr", 1)?.as_slice());
     assert_eq!(pdu.window_size().to_be_bytes(), descendant_value(&node, "tcp", "window_size_value", 2)?.as_slice());
-    //assert_eq!(pdu.computed_window_size().to_be_bytes(), descendant_value(&node, "tcp", "window_size", 4)?.as_slice()); // wireshark tcp.window_size[value] is incorrect
+    assert_eq!(pdu.computed_window_size(0).to_be_bytes(), descendant_value(&node, "tcp", "window_size", 4)?.as_slice());
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "tcp", "checksum", 2)?.as_slice());
     if descendant_show(&node, "tcp", "checksum.status", 1)?.eq(&[0x01]) {
         assert_eq!(
@@ -270,6 +270,7 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
             descendant_value(&node, "tcp", "checksum", 2)?.as_slice()
         );
     }
+    assert_eq!(pdu.urgent_pointer().to_be_bytes(), descendant_value(&node, "tcp", "urgent_pointer", 2)?.as_slice());
 
     let mut options = pdu.options().collect::<VecDeque<TcpOption>>();
 
