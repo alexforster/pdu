@@ -161,7 +161,7 @@ impl<'a> TcpPdu<'a> {
     }
 
     pub fn computed_window_size(&'a self, shift: u8) -> u32 {
-        (self.window_size() as u32) << (shift as usize % std::mem::size_of::<u32>()) as u32
+        (self.window_size() as u32) << (shift as u32)
     }
 
     pub fn checksum(&'a self) -> u16 {
