@@ -74,6 +74,11 @@ impl<'a> EthernetPdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Ethernet<'a>> {
+        self.clone().into_inner()
+    }
+
+    /// Consumes this object and returns an object representing the inner payload of this PDU
+    pub fn into_inner(self) -> Result<Ethernet<'a>> {
         let rest = &self.buffer[self.computed_ihl()..];
         Ok(match self.ethertype() {
             EtherType::ARP => Ethernet::Arp(super::ArpPdu::new(rest)?),

@@ -64,6 +64,11 @@ impl<'a> GrePdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Gre<'a>> {
+        self.clone().into_inner()
+    }
+
+    /// Consumes this object and returns an object representing the inner payload of this PDU
+    pub fn into_inner(self) -> Result<Gre<'a>> {
         let rest = &self.buffer[self.computed_ihl()..];
         Ok(match self.ethertype() {
             super::EtherType::TEB => Gre::Ethernet(super::EthernetPdu::new(rest)?),

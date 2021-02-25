@@ -124,6 +124,11 @@ impl<'a> Ipv4Pdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Ipv4<'a>> {
+        self.clone().into_inner()
+    }
+
+    /// Consumes this object and returns an object representing the inner payload of this PDU
+    pub fn into_inner(self) -> Result<Ipv4<'a>> {
         let rest = &self.buffer[self.computed_ihl()..];
 
         if self.fragment_offset() > 0 {
@@ -306,6 +311,11 @@ impl<'a> Ipv6Pdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Ipv6<'a>> {
+        self.clone().into_inner()
+    }
+
+    /// Consumes this object and returns an object representing the inner payload of this PDU
+    pub fn into_inner(self) -> Result<Ipv6<'a>> {
         let rest = &self.buffer[self.computed_ihl()..];
 
         if self.computed_fragment_offset().unwrap_or_default() > 0 {
