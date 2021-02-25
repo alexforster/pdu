@@ -54,7 +54,7 @@ enum variants.
 
 ```toml
 [dependencies]
-pdu = "1.0"
+pdu = "1.1"
 ```
 
 #### Examples
