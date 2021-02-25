@@ -18,7 +18,7 @@
 
 use core::convert::TryInto;
 
-pub fn checksum<'a, I, J>(spans: I) -> u16
+pub fn checksum<I, J>(spans: I) -> u16
 where
     I: IntoIterator<Item = J>,
     J: AsRef<[u8]>,
@@ -55,5 +55,5 @@ fn sum(mut buffer: &[u8]) -> u16 {
     }
 
     accum = (accum >> 16) + (accum & 0xffff);
-    (((accum >> 16) as u16) + (accum as u16))
+    ((accum >> 16) as u16) + (accum as u16)
 }

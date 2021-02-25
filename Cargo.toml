@@ -21,8 +21,8 @@ std = []
 
 [dev-dependencies]
 base16 = { version = "~0.2" }
-roxmltree = { version = "~0.9" }
-pcap = { version = "~0.7" }
+roxmltree = { version = "~0.14", features = ["std"] }
+pcap = { version = "~0.8" }
 
 [workspace]
 members = [

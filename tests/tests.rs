@@ -313,10 +313,10 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
             "tcp.options.sack" => {
                 if let Some(TcpOption::Sack { blocks }) = options.pop_front() {
                     match blocks {
-                        [Some((l, r)), None, None, None]
-                        | [Some((l, _)), Some((_, r)), None, None]
-                        | [Some((l, _)), Some((_, _)), Some((_, r)), None]
-                        | [Some((l, _)), Some((_, _)), Some((_, _)), Some((_, r))] => {
+                        [Some((l, r)), None, None, None] |
+                        [Some((l, _)), Some((_, r)), None, None] |
+                        [Some((l, _)), Some((_, _)), Some((_, r)), None] |
+                        [Some((l, _)), Some((_, _)), Some((_, _)), Some((_, r))] => {
                             assert_eq!(
                                 &l.to_be_bytes(),
                                 descendant_value(&node, "tcp", "options.sack_le", 4)?.as_slice()
