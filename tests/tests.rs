@@ -56,7 +56,7 @@ fn hex_decode<T: ?Sized + AsRef<[u8]>>(length: usize, input: &T) -> Vec<u8> {
 
 fn descendant_value(node: &xml::Node, proto: &str, field: &str, length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
     let descendant = node.descendants().find(|n| n.attribute("name") == Some(format!("{}.{}", proto, field).as_str()));
-    //eprintln!("{}.{} = {:?}", proto, field, descendant);
+    eprintln!("{}.{} = {:?}", proto, field, descendant);
     let descendant = if let Some(descendant) = descendant {
         descendant
     } else {
@@ -72,7 +72,7 @@ fn descendant_value(node: &xml::Node, proto: &str, field: &str, length: usize) -
 
 fn descendant_show(node: &xml::Node, proto: &str, field: &str, length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
     let descendant = node.descendants().find(|n| n.attribute("name") == Some(format!("{}.{}", proto, field).as_str()));
-    //eprintln!("{}.{} = {:?}", proto, field, descendant);
+    eprintln!("{}.{} = {:?}", proto, field, descendant);
     let descendant = if let Some(descendant) = descendant {
         descendant
     } else {
@@ -151,7 +151,8 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     assert_eq!(node.attribute("name"), Some("ip"));
 
     assert_eq!(pdu.version().to_be_bytes(), descendant_value(&node, "ip", "version", 1)?.as_slice());
-    //assert_eq!(pdu.ihl().to_be_bytes(), descendant_value(&node, "ip", "hdr_len", 1)?.as_slice()); // wireshark ip.hdr_len is incorrect
+    // wireshark 2.6 ip.hdr_len[value] is not correctly right-shifted by 4
+    //assert_eq!(pdu.ihl().to_be_bytes(), descendant_value(&node, "ip", "hdr_len", 1)?.as_slice());
     assert_eq!(pdu.dscp().to_be_bytes(), descendant_value(&node, "ip", "dsfield.dscp", 1)?.as_slice());
     assert_eq!(pdu.ecn().to_be_bytes(), descendant_value(&node, "ip", "dsfield.ecn", 1)?.as_slice());
     assert_eq!(pdu.total_length().to_be_bytes(), descendant_value(&node, "ip", "len", 2)?.as_slice());
@@ -218,10 +219,11 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
             pdu.computed_identification().unwrap().to_be_bytes(),
             descendant_value(&fraghdr, "ipv6", "fraghdr.ident", 4)?.as_slice()
         );
-        assert_eq!(
-            pdu.computed_fragment_offset().unwrap().to_be_bytes(),
-            descendant_value(&fraghdr, "ipv6", "fraghdr.offset", 2)?.as_slice()
-        );
+        // wireshark 2.6 ipv6.fraghdr.offset[value] is not correctly multiplied by 8
+        //assert_eq!(
+        //    pdu.computed_fragment_offset().unwrap().to_be_bytes(),
+        //    descendant_value(&fraghdr, "ipv6", "fraghdr.offset", 2)?.as_slice()
+        //);
         assert_eq!(
             &[pdu.computed_more_fragments().unwrap() as u8],
             descendant_value(&fraghdr, "ipv6", "fraghdr.more", 1)?.as_slice()
@@ -251,7 +253,8 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
     assert_eq!(pdu.destination_port().to_be_bytes(), descendant_value(&node, "tcp", "dstport", 2)?.as_slice());
     assert_eq!(pdu.sequence_number().to_be_bytes(), descendant_value(&node, "tcp", "seq", 4)?.as_slice());
     assert_eq!(pdu.acknowledgement_number().to_be_bytes(), descendant_value(&node, "tcp", "ack", 4)?.as_slice());
-    //assert_eq!(pdu.data_offset().to_be_bytes(), descendant_value(&node, "tcp", "hdr_len", 1)?.as_slice()); // wireshark tcp.hdr_len[value] is incorrect
+    // wireshark 2.6 tcp.hdr_len[value] is not correctly right-shifted by 4
+    //assert_eq!(pdu.data_offset().to_be_bytes(), descendant_value(&node, "tcp", "hdr_len", 1)?.as_slice());
     assert_eq!(pdu.flags().to_be_bytes(), descendant_value(&node, "tcp", "flags", 1)?.as_slice());
     assert_eq!((pdu.fin() as u8).to_be_bytes(), descendant_value(&node, "tcp", "flags.fin", 1)?.as_slice());
     assert_eq!((pdu.syn() as u8).to_be_bytes(), descendant_value(&node, "tcp", "flags.syn", 1)?.as_slice());
@@ -507,7 +510,7 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
                 continue;
             }
 
-            //eprintln!("{} (#{})", &pcap_file, i + 1);
+            eprintln!("{} (#{})", &pcap_file, i + 1);
             let first_layer = dissections.front().unwrap().attribute("name");
             if first_layer == Some("eth") {
                 match EthernetPdu::new(&data) {

@@ -190,6 +190,10 @@ impl<'a> Ipv4Pdu<'a> {
         u16::from_be_bytes([self.buffer[6] & 0x1f, self.buffer[7]])
     }
 
+    pub fn computed_fragment_offset(&'a self) -> u16 {
+        self.fragment_offset() * 8
+    }
+
     pub fn ttl(&'a self) -> u8 {
         self.buffer[8]
     }
@@ -402,7 +406,7 @@ impl<'a> Ipv6Pdu<'a> {
     pub fn computed_fragment_offset(&'a self) -> Option<u16> {
         for header in self.extension_headers() {
             if let Ipv6ExtensionHeader::Fragment { offset, .. } = header {
-                return Some(offset);
+                return Some(offset * 8);
             }
         }
         None
