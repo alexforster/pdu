@@ -36,7 +36,7 @@ impl<'a> UdpPdu<'a> {
     /// Constructs a [`UdpPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
         let pdu = UdpPdu { buffer };
-        if buffer.len() < 8 || (pdu.length() as usize) < buffer.len() {
+        if buffer.len() < 8 {
             return Err(Error::Truncated);
         }
         Ok(pdu)

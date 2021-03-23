@@ -75,7 +75,6 @@ impl<'a> Ipv4Pdu<'a> {
             return Err(Error::Truncated);
         }
         if buffer.len() < (pdu.computed_ihl() as usize)
-            || buffer.len() < (pdu.total_length() as usize)
             || (pdu.total_length() as usize) < pdu.computed_ihl()
         {
             return Err(Error::Malformed);
