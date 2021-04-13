@@ -93,7 +93,13 @@ impl<'a> TcpPdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Tcp<'a>> {
-        Ok(Tcp::Raw(&self.buffer[self.computed_data_offset()..]))
+        self.clone().into_inner()
+    }
+
+    /// Consumes this object and returns an object representing the inner payload of this PDU
+    pub fn into_inner(self) -> Result<Tcp<'a>> {
+        let rest = &self.buffer[self.computed_data_offset()..];
+        Ok(Tcp::Raw(rest))
     }
 
     pub fn source_port(&'a self) -> u16 {

@@ -54,7 +54,13 @@ impl<'a> UdpPdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Udp<'a>> {
-        Ok(Udp::Raw(&self.buffer[8..]))
+        self.clone().into_inner()
+    }
+
+    /// Consumes this object and returns an object representing the inner payload of this PDU
+    pub fn into_inner(self) -> Result<Udp<'a>> {
+        let rest = &self.buffer[8..];
+        Ok(Udp::Raw(rest))
     }
 
     pub fn source_port(&'a self) -> u16 {

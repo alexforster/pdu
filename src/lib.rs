@@ -36,7 +36,7 @@ mod udp;
 pub use udp::{Udp, UdpPdu};
 
 mod icmp;
-pub use icmp::IcmpPdu;
+pub use icmp::{Icmp, IcmpPdu};
 
 mod gre;
 pub use gre::{Gre, GrePdu};

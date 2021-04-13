@@ -41,7 +41,6 @@ pub fn fuzz(data: &[u8]) {
                 .unwrap(),
             );
             icmp_pdu.computed_checksum(&ip);
-            icmp_pdu.message();
         }
         Err(_) => {}
     }

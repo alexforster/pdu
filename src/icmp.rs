@@ -26,6 +26,12 @@ pub struct IcmpPdu<'a> {
     buffer: &'a [u8],
 }
 
+/// Contains the inner payload of an [`IcmpPdu`]
+#[derive(Debug, Copy, Clone)]
+pub enum Icmp<'a> {
+    Raw(&'a [u8]),
+}
+
 impl<'a> IcmpPdu<'a> {
     /// Constructs a [`IcmpPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
@@ -40,9 +46,20 @@ impl<'a> IcmpPdu<'a> {
         self.buffer
     }
 
-    /// Returns the slice of the underlying buffer that contains this PDU
+    /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         &self.buffer[0..8]
+    }
+
+    /// Returns an object representing the inner payload of this PDU
+    pub fn inner(&'a self) -> Result<Icmp<'a>> {
+        self.clone().into_inner()
+    }
+
+    /// Consumes this object and returns an object representing the inner payload of this PDU
+    pub fn into_inner(self) -> Result<Icmp<'a>> {
+        let rest = &self.buffer[4..];
+        Ok(Icmp::Raw(rest))
     }
 
     pub fn message_type(&'a self) -> u8 {
@@ -71,6 +88,7 @@ impl<'a> IcmpPdu<'a> {
         }
     }
 
+    #[deprecated(since = "1.3.0", note = "use IcmpPdu::inner()")]
     pub fn message(&'a self) -> &'a [u8] {
         &self.buffer[4..]
     }
