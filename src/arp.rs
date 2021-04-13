@@ -52,8 +52,19 @@ impl<'a> ArpPdu<'a> {
         self.buffer
     }
 
+    /// Consumes this object and returns a reference to the entire underlying buffer that was provided during
+    /// construction
+    pub fn into_buffer(self) -> &'a [u8] {
+        self.buffer
+    }
+
     /// Returns the slice of the underlying buffer that contains this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
+        self.clone().into_bytes()
+    }
+
+    /// Consumes this object and returns the slice of the underlying buffer that contains this PDU
+    pub fn into_bytes(self) -> &'a [u8] {
         &self.buffer[0..28]
     }
 

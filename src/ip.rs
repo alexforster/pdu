@@ -74,9 +74,7 @@ impl<'a> Ipv4Pdu<'a> {
         if buffer.len() < 20 || pdu.computed_ihl() < 20 {
             return Err(Error::Truncated);
         }
-        if buffer.len() < (pdu.computed_ihl() as usize)
-            || (pdu.total_length() as usize) < pdu.computed_ihl()
-        {
+        if buffer.len() < (pdu.computed_ihl() as usize) || (pdu.total_length() as usize) < pdu.computed_ihl() {
             return Err(Error::Malformed);
         }
         if pdu.version() != 4 {
@@ -116,8 +114,19 @@ impl<'a> Ipv4Pdu<'a> {
         self.buffer
     }
 
+    /// Consumes this object and returns a reference to the entire underlying buffer that was provided during
+    /// construction
+    pub fn into_buffer(self) -> &'a [u8] {
+        self.buffer
+    }
+
     /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
+        self.clone().into_bytes()
+    }
+
+    /// Consumes this object and returns the slice of the underlying buffer that contains the header part of this PDU
+    pub fn into_bytes(self) -> &'a [u8] {
         &self.buffer[0..self.computed_ihl()]
     }
 
@@ -309,6 +318,11 @@ impl<'a> Ipv6Pdu<'a> {
 
     /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
+        self.clone().into_bytes()
+    }
+
+    /// Consumes this object and returns the slice of the underlying buffer that contains the header part of this PDU
+    pub fn into_bytes(self) -> &'a [u8] {
         &self.buffer[0..self.computed_ihl()]
     }
 
