@@ -87,7 +87,8 @@ impl<'a> Ipv4Pdu<'a> {
                     return Err(Error::Truncated);
                 }
                 position += match buffer[position] {
-                    0 | 1 => 1usize,
+                    0 => break,
+                    1 => 1,
                     _ => {
                         if buffer.len() <= (position + 1) {
                             return Err(Error::Truncated);
@@ -101,9 +102,6 @@ impl<'a> Ipv4Pdu<'a> {
             }
             if buffer.len() < position {
                 return Err(Error::Truncated);
-            }
-            if pdu.computed_ihl() != position {
-                return Err(Error::Malformed);
             }
         }
         Ok(pdu)
