@@ -1,6 +1,6 @@
 [package]
 name = "pdu"
-version = "1.3.0"
+version = "1.3.1"
 description = "Small, fast, and correct L2/L3/L4 packet parser."
 readme = "README.md"
 authors = ["Alex Forster <alex@alexforster.com>"]
