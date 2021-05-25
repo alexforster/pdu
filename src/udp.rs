@@ -110,4 +110,8 @@ impl<'a> UdpPdu<'a> {
             ]),
         }
     }
+
+    pub fn computed_data_offset(&'a self) -> usize {
+        8
+    }
 }
