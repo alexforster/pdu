@@ -314,6 +314,12 @@ impl<'a> Ipv6Pdu<'a> {
         self.buffer
     }
 
+    /// Consumes this object and returns a reference to the entire underlying buffer that was provided during
+    /// construction
+    pub fn into_buffer(self) -> &'a [u8] {
+        self.buffer
+    }
+
     /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
         self.clone().into_bytes()
