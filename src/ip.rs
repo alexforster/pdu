@@ -80,30 +80,6 @@ impl<'a> Ipv4Pdu<'a> {
         if pdu.version() != 4 {
             return Err(Error::Malformed);
         }
-        if pdu.computed_ihl() > 20 {
-            let mut position = 20;
-            while position < pdu.computed_ihl() {
-                if buffer.len() <= position {
-                    return Err(Error::Truncated);
-                }
-                position += match buffer[position] {
-                    0 => break,
-                    1 => 1,
-                    _ => {
-                        if buffer.len() <= (position + 1) {
-                            return Err(Error::Truncated);
-                        }
-                        if buffer[position + 1] < 2 {
-                            return Err(Error::Malformed);
-                        }
-                        buffer[position + 1] as usize
-                    }
-                };
-            }
-            if buffer.len() < position {
-                return Err(Error::Truncated);
-            }
-        }
         Ok(pdu)
     }
 
@@ -253,10 +229,22 @@ impl<'a> Iterator for Ipv4OptionIterator<'a> {
         if self.pos < self.ihl {
             let pos = self.pos;
             let option = self.buffer[pos];
-            let len = match self.buffer[self.pos] {
+            let len = match option {
                 0 | 1 => 1usize,
-                _ => self.buffer[pos + 1] as usize,
+                _ => {
+                    if self.ihl <= (pos + 1) {
+                        return None;
+                    }
+                    let len = self.buffer[pos + 1] as usize;
+                    if len < 2 {
+                        return None;
+                    }
+                    len
+                }
             };
+            if self.ihl < (pos + len) {
+                return None;
+            }
             self.pos += len;
             Some(Ipv4Option::Raw { option, data: &self.buffer[pos..(pos + len)] })
         } else {

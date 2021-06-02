@@ -52,30 +52,6 @@ impl<'a> TcpPdu<'a> {
         if buffer.len() < 20 || buffer.len() < pdu.computed_data_offset() {
             return Err(Error::Truncated);
         }
-        if pdu.computed_data_offset() > 20 {
-            let mut position = 20;
-            while position < pdu.computed_data_offset() {
-                if buffer.len() <= position {
-                    return Err(Error::Truncated);
-                }
-                position += match buffer[position] {
-                    0 => break,
-                    1 => 1,
-                    _ => {
-                        if buffer.len() <= (position + 1) {
-                            return Err(Error::Truncated);
-                        }
-                        if buffer[position + 1] < 2 {
-                            return Err(Error::Malformed);
-                        }
-                        buffer[position + 1] as usize
-                    }
-                };
-            }
-            if buffer.len() < position {
-                return Err(Error::Truncated);
-            }
-        }
         Ok(pdu)
     }
 
@@ -241,8 +217,20 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
             let option = self.buffer[pos];
             let len = match option {
                 0 | 1 => 1usize,
-                _ => self.buffer[pos + 1] as usize,
+                _ => {
+                    if self.data_offset <= (pos + 1) {
+                        return None;
+                    }
+                    let len = self.buffer[pos + 1] as usize;
+                    if len < 2 {
+                        return None;
+                    }
+                    len
+                }
             };
+            if self.data_offset < (pos + len) {
+                return None;
+            }
             self.pos += len;
             match option {
                 0 => None,
