@@ -152,7 +152,7 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result
     assert_eq!(node.attribute("name"), Some("ip"));
 
     assert_eq!(pdu.version().to_be_bytes(), descendant_value(&node, "ip", "version", 1)?.as_slice());
-    // wireshark 2.6 ip.hdr_len[value] is not correctly right-shifted by 4
+    // wireshark 3.2.3 ip.hdr_len[value] is not correctly right-shifted by 4
     //assert_eq!(pdu.ihl().to_be_bytes(), descendant_value(&node, "ip", "hdr_len", 1)?.as_slice());
     assert_eq!(pdu.dscp().to_be_bytes(), descendant_value(&node, "ip", "dsfield.dscp", 1)?.as_slice());
     assert_eq!(pdu.ecn().to_be_bytes(), descendant_value(&node, "ip", "dsfield.ecn", 1)?.as_slice());
@@ -160,7 +160,8 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result
     assert_eq!(pdu.identification().to_be_bytes(), descendant_value(&node, "ip", "id", 2)?.as_slice());
     assert_eq!((pdu.dont_fragment() as u8).to_be_bytes(), descendant_value(&node, "ip", "flags.df", 1)?.as_slice());
     assert_eq!((pdu.more_fragments() as u8).to_be_bytes(), descendant_value(&node, "ip", "flags.mf", 1)?.as_slice());
-    assert_eq!(pdu.fragment_offset().to_be_bytes(), descendant_value(&node, "ip", "frag_offset", 2)?.as_slice());
+    // wireshark 3.2.3 ip.frag_offset[value] is not correctly masked with 0x1FFF
+    //assert_eq!(pdu.fragment_offset().to_be_bytes(), descendant_value(&node, "ip", "frag_offset", 2)?.as_slice());
     assert_eq!(pdu.ttl().to_be_bytes(), descendant_value(&node, "ip", "ttl", 1)?.as_slice());
     assert_eq!(pdu.protocol().to_be_bytes(), descendant_value(&node, "ip", "proto", 1)?.as_slice());
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "ip", "checksum", 2)?.as_slice());
@@ -223,7 +224,7 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result
             pdu.computed_identification().unwrap().to_be_bytes(),
             descendant_value(&fraghdr, "ipv6", "fraghdr.ident", 4)?.as_slice()
         );
-        // wireshark 2.6 ipv6.fraghdr.offset[value] is not correctly multiplied by 8
+        // wireshark 3.2.3 ipv6.fraghdr.offset[value] is not correctly multiplied by 8
         //assert_eq!(
         //    pdu.computed_fragment_offset().unwrap().to_be_bytes(),
         //    descendant_value(&fraghdr, "ipv6", "fraghdr.offset", 2)?.as_slice()
@@ -260,7 +261,7 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>
     assert_eq!(pdu.destination_port().to_be_bytes(), descendant_value(&node, "tcp", "dstport", 2)?.as_slice());
     assert_eq!(pdu.sequence_number().to_be_bytes(), descendant_value(&node, "tcp", "seq", 4)?.as_slice());
     assert_eq!(pdu.acknowledgement_number().to_be_bytes(), descendant_value(&node, "tcp", "ack", 4)?.as_slice());
-    // wireshark 2.6 tcp.hdr_len[value] is not correctly right-shifted by 4
+    // wireshark 3.2.3 tcp.hdr_len[value] is not correctly right-shifted by 4
     //assert_eq!(pdu.data_offset().to_be_bytes(), descendant_value(&node, "tcp", "hdr_len", 1)?.as_slice());
     assert_eq!(pdu.flags().to_be_bytes(), descendant_value(&node, "tcp", "flags", 1)?.as_slice());
     assert_eq!((pdu.fin() as u8).to_be_bytes(), descendant_value(&node, "tcp", "flags.fin", 1)?.as_slice());

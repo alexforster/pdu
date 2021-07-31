@@ -13,9 +13,8 @@ fi
 DOCKER="docker"
 
 ${DOCKER} build -t pdu-fuzz - <<'EOF'
-FROM ubuntu:bionic
-ENV LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+FROM ubuntu:focal
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 VOLUME /usr/local/src/pdu
 WORKDIR /usr/local/src/pdu
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]

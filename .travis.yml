@@ -1,10 +1,10 @@
 os:
   - linux
-dist: bionic
+dist: focal
 
 language: rust
 rust:
   - stable
 
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get -y install libpcap-dev tshark; fi
+  - sudo apt-get -y install libpcap-dev tshark
