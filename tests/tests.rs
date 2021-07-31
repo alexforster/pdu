@@ -26,10 +26,6 @@ use std::path;
 use std::process::{Command, Stdio};
 use std::result::Result;
 
-use base16;
-use pcap;
-use roxmltree as xml;
-
 fn hex_decode<T: ?Sized + AsRef<[u8]>>(length: usize, input: &T) -> Vec<u8> {
     let input = input.as_ref();
     let mut padding = Vec::new();
@@ -54,7 +50,9 @@ fn hex_decode<T: ?Sized + AsRef<[u8]>>(length: usize, input: &T) -> Vec<u8> {
     }
 }
 
-fn descendant_value(node: &xml::Node, proto: &str, field: &str, length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+fn descendant_value(
+    node: &roxmltree::Node, proto: &str, field: &str, length: usize,
+) -> Result<Vec<u8>, Box<dyn Error>> {
     let descendant = node.descendants().find(|n| n.attribute("name") == Some(format!("{}.{}", proto, field).as_str()));
     eprintln!("{}.{} = {:?}", proto, field, descendant);
     let descendant = if let Some(descendant) = descendant {
@@ -70,7 +68,7 @@ fn descendant_value(node: &xml::Node, proto: &str, field: &str, length: usize) -
     Ok(hex_decode(length, value))
 }
 
-fn descendant_show(node: &xml::Node, proto: &str, field: &str, length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+fn descendant_show(node: &roxmltree::Node, proto: &str, field: &str, length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
     let descendant = node.descendants().find(|n| n.attribute("name") == Some(format!("{}.{}", proto, field).as_str()));
     eprintln!("{}.{} = {:?}", proto, field, descendant);
     let descendant = if let Some(descendant) = descendant {
@@ -86,7 +84,7 @@ fn descendant_show(node: &xml::Node, proto: &str, field: &str, length: usize) ->
     Ok(hex_decode(length, value))
 }
 
-fn visit_ethernet_pdu(pdu: &EthernetPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_ethernet_pdu(pdu: &EthernetPdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -114,7 +112,10 @@ fn visit_ethernet_pdu(pdu: &EthernetPdu, mut nodes: VecDeque<xml::Node>) -> Resu
 
     match pdu.inner() {
         Ok(ethernet) => match ethernet {
-            Ethernet::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
+            Ethernet::Raw(raw) => {
+                assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
+                Ok(())
+            }
             Ethernet::Arp(arp_pdu) => visit_arp_pdu(&arp_pdu, nodes),
             Ethernet::Ipv4(ipv4_pdu) => visit_ipv4_pdu(&ipv4_pdu, nodes),
             Ethernet::Ipv6(ipv6_pdu) => visit_ipv6_pdu(&ipv6_pdu, nodes),
@@ -123,7 +124,7 @@ fn visit_ethernet_pdu(pdu: &EthernetPdu, mut nodes: VecDeque<xml::Node>) -> Resu
     }
 }
 
-fn visit_arp_pdu(pdu: &ArpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_arp_pdu(pdu: &ArpPdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -143,7 +144,7 @@ fn visit_arp_pdu(pdu: &ArpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box
     Ok(())
 }
 
-fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -170,7 +171,7 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     assert_eq!(pdu.destination_address().as_ref(), descendant_value(&node, "ip", "dst", 4)?.as_slice());
 
     if let Some(options) = node.children().find(|n| n.attribute("name") == Some("")) {
-        let mut options = options.children().filter(|n| n.is_element()).collect::<VecDeque<xml::Node>>();
+        let mut options = options.children().filter(|n| n.is_element()).collect::<VecDeque<roxmltree::Node>>();
         for option in pdu.options() {
             let node = options.pop_front().unwrap();
             match option {
@@ -187,7 +188,10 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
 
     match pdu.inner() {
         Ok(ipv4) => match ipv4 {
-            Ipv4::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
+            Ipv4::Raw(raw) => {
+                assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
+                Ok(())
+            }
             Ipv4::Tcp(tcp_pdu) => visit_tcp_pdu(&tcp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv4(*pdu), nodes),
@@ -197,7 +201,7 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     }
 }
 
-fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -232,7 +236,10 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
 
     match pdu.inner() {
         Ok(ipv6) => match ipv6 {
-            Ipv6::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
+            Ipv6::Raw(raw) => {
+                assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
+                Ok(())
+            }
             Ipv6::Tcp(tcp_pdu) => visit_tcp_pdu(&tcp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv6(*pdu), nodes),
@@ -242,7 +249,7 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     }
 }
 
-fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -269,7 +276,7 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "tcp", "checksum", 2)?.as_slice());
     if descendant_show(&node, "tcp", "checksum.status", 1)?.eq(&[0x01]) {
         assert_eq!(
-            pdu.computed_checksum(&ip_pdu).to_be_bytes(),
+            pdu.computed_checksum(ip_pdu).to_be_bytes(),
             descendant_value(&node, "tcp", "checksum", 2)?.as_slice()
         );
     }
@@ -358,7 +365,7 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
     Ok(())
 }
 
-fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -371,7 +378,7 @@ fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "udp", "checksum", 2)?.as_slice());
     if descendant_show(&node, "udp", "checksum.status", 1)?.eq(&[0x01]) {
         assert_eq!(
-            pdu.computed_checksum(&ip_pdu).to_be_bytes(),
+            pdu.computed_checksum(ip_pdu).to_be_bytes(),
             descendant_value(&node, "udp", "checksum", 2)?.as_slice()
         );
     }
@@ -379,7 +386,7 @@ fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
     Ok(())
 }
 
-fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -396,7 +403,7 @@ fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) ->
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, proto, "checksum", 2)?.as_slice());
     if descendant_show(&node, proto, "checksum.status", 1)?.eq(&[0x01]) {
         assert_eq!(
-            pdu.computed_checksum(&ip_pdu).to_be_bytes(),
+            pdu.computed_checksum(ip_pdu).to_be_bytes(),
             descendant_value(&node, proto, "checksum", 2)?.as_slice()
         );
     }
@@ -404,7 +411,7 @@ fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) ->
     Ok(())
 }
 
-fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -437,7 +444,10 @@ fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box
 
     match pdu.inner() {
         Ok(gre) => match gre {
-            Gre::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
+            Gre::Raw(raw) => {
+                assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
+                Ok(())
+            }
             Gre::Ethernet(ethernet_pdu) => visit_ethernet_pdu(&ethernet_pdu, nodes),
             Gre::Ipv4(ipv4_pdu) => visit_ipv4_pdu(&ipv4_pdu, nodes),
             Gre::Ipv6(ipv6_pdu) => visit_ipv6_pdu(&ipv6_pdu, nodes),
@@ -482,8 +492,8 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
         }
 
         let dissections = String::from_utf8(output.stdout)?;
-        let dissections = xml::Document::parse(dissections.as_str())?;
-        let dissections: Vec<xml::Node> =
+        let dissections = roxmltree::Document::parse(dissections.as_str())?;
+        let dissections: Vec<roxmltree::Node> =
             dissections.root().first_element_child().unwrap().children().filter(|n| n.is_element()).collect();
 
         let mut pcap = match pcap::Capture::from_file(&pcap_file) {
@@ -498,7 +508,7 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
         for dissection in dissections.iter() {
             let data = pcap.next().unwrap().data;
             i += 1;
-            let dissections: VecDeque<xml::Node> = dissection
+            let dissections: VecDeque<roxmltree::Node> = dissection
                 .children()
                 .filter(|n| n.is_element())
                 .skip(2)
@@ -513,7 +523,7 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
             eprintln!("{} (#{})", &pcap_file, i + 1);
             let first_layer = dissections.front().unwrap().attribute("name");
             if first_layer == Some("eth") {
-                match EthernetPdu::new(&data) {
+                match EthernetPdu::new(data) {
                     Ok(ethernet_pdu) => match visit_ethernet_pdu(&ethernet_pdu, dissections) {
                         Ok(()) => {}
                         Err(e) => {
@@ -527,7 +537,7 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
                     }
                 }
             } else if first_layer == Some("ip") || first_layer == Some("ipv6") {
-                match Ip::new(&data) {
+                match Ip::new(data) {
                     Ok(Ip::Ipv4(ipv4_pdu)) => match visit_ipv4_pdu(&ipv4_pdu, dissections) {
                         Ok(()) => {}
                         Err(e) => {

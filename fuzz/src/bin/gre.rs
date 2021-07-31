@@ -19,24 +19,21 @@
 use pdu::*;
 
 pub fn fuzz(data: &[u8]) {
-    match GrePdu::new(&data) {
-        Ok(gre_pdu) => {
-            gre_pdu.computed_ihl();
-            gre_pdu.version();
-            gre_pdu.ethertype();
-            gre_pdu.checksum();
-            gre_pdu.computed_checksum();
-            gre_pdu.key();
-            gre_pdu.sequence_number();
-        }
-        Err(_) => {}
+    if let Ok(gre_pdu) = GrePdu::new(data) {
+        gre_pdu.computed_ihl();
+        gre_pdu.version();
+        gre_pdu.ethertype();
+        gre_pdu.checksum();
+        gre_pdu.computed_checksum();
+        gre_pdu.key();
+        gre_pdu.sequence_number();
     }
 }
 
 fn main() {
     loop {
         honggfuzz::fuzz!(|data: &[u8]| {
-            fuzz(&data);
+            fuzz(data);
         });
     }
 }

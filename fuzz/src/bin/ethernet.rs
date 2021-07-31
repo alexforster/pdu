@@ -19,24 +19,21 @@
 use pdu::*;
 
 pub fn fuzz(data: &[u8]) {
-    match EthernetPdu::new(&data) {
-        Ok(ethernet_pdu) => {
-            ethernet_pdu.computed_ihl();
-            ethernet_pdu.destination_address();
-            ethernet_pdu.source_address();
-            ethernet_pdu.ethertype();
-            ethernet_pdu.vlan();
-            ethernet_pdu.vlan_pcp();
-            ethernet_pdu.vlan_dei();
-        }
-        Err(_) => {}
+    if let Ok(ethernet_pdu) = EthernetPdu::new(data) {
+        ethernet_pdu.computed_ihl();
+        ethernet_pdu.destination_address();
+        ethernet_pdu.source_address();
+        ethernet_pdu.ethertype();
+        ethernet_pdu.vlan();
+        ethernet_pdu.vlan_pcp();
+        ethernet_pdu.vlan_dei();
     }
 }
 
 fn main() {
     loop {
         honggfuzz::fuzz!(|data: &[u8]| {
-            fuzz(&data);
+            fuzz(data);
         });
     }
 }

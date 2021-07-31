@@ -60,7 +60,7 @@ impl<'a> ArpPdu<'a> {
 
     /// Returns the slice of the underlying buffer that contains this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
-        self.clone().into_bytes()
+        (*self).into_bytes()
     }
 
     /// Consumes this object and returns the slice of the underlying buffer that contains this PDU

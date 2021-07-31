@@ -19,40 +19,37 @@
 use pdu::*;
 
 pub fn fuzz(data: &[u8]) {
-    match Ipv4Pdu::new(&data) {
-        Ok(ipv4_pdu) => {
-            ipv4_pdu.version();
-            ipv4_pdu.ihl();
-            ipv4_pdu.computed_ihl();
-            ipv4_pdu.dscp();
-            ipv4_pdu.ecn();
-            ipv4_pdu.total_length();
-            ipv4_pdu.identification();
-            ipv4_pdu.dont_fragment();
-            ipv4_pdu.more_fragments();
-            ipv4_pdu.fragment_offset();
-            ipv4_pdu.ttl();
-            ipv4_pdu.protocol();
-            ipv4_pdu.checksum();
-            ipv4_pdu.computed_checksum();
-            ipv4_pdu.source_address();
-            ipv4_pdu.destination_address();
-            for option in ipv4_pdu.options() {
-                match option {
-                    Ipv4Option::Raw { .. } => {
-                        continue;
-                    }
+    if let Ok(ipv4_pdu) = Ipv4Pdu::new(data) {
+        ipv4_pdu.version();
+        ipv4_pdu.ihl();
+        ipv4_pdu.computed_ihl();
+        ipv4_pdu.dscp();
+        ipv4_pdu.ecn();
+        ipv4_pdu.total_length();
+        ipv4_pdu.identification();
+        ipv4_pdu.dont_fragment();
+        ipv4_pdu.more_fragments();
+        ipv4_pdu.fragment_offset();
+        ipv4_pdu.ttl();
+        ipv4_pdu.protocol();
+        ipv4_pdu.checksum();
+        ipv4_pdu.computed_checksum();
+        ipv4_pdu.source_address();
+        ipv4_pdu.destination_address();
+        for option in ipv4_pdu.options() {
+            match option {
+                Ipv4Option::Raw { .. } => {
+                    continue;
                 }
             }
         }
-        Err(_) => {}
     }
 }
 
 fn main() {
     loop {
         honggfuzz::fuzz!(|data: &[u8]| {
-            fuzz(&data);
+            fuzz(data);
         });
     }
 }

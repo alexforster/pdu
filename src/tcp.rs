@@ -68,7 +68,7 @@ impl<'a> TcpPdu<'a> {
 
     /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
-        self.clone().into_bytes()
+        (*self).into_bytes()
     }
 
     /// Consumes this object and returns the slice of the underlying buffer that contains the header part of this PDU
@@ -78,7 +78,7 @@ impl<'a> TcpPdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Tcp<'a>> {
-        self.clone().into_inner()
+        (*self).into_inner()
     }
 
     /// Consumes this object and returns an object representing the inner payload of this PDU
@@ -162,18 +162,18 @@ impl<'a> TcpPdu<'a> {
     pub fn computed_checksum(&'a self, ip: &crate::Ip) -> u16 {
         match ip {
             crate::Ip::Ipv4(ipv4) => util::checksum(&[
-                &ipv4.source_address().as_ref(),
-                &ipv4.destination_address().as_ref(),
-                &[0x00, ipv4.protocol()].as_ref(),
-                &(ipv4.total_length() as usize - ipv4.computed_ihl()).to_be_bytes().as_ref(),
+                ipv4.source_address().as_ref(),
+                ipv4.destination_address().as_ref(),
+                [0x00, ipv4.protocol()].as_ref(),
+                (ipv4.total_length() as usize - ipv4.computed_ihl()).to_be_bytes().as_ref(),
                 &self.buffer[0..16],
                 &self.buffer[18..],
             ]),
             crate::Ip::Ipv6(ipv6) => util::checksum(&[
-                &ipv6.source_address().as_ref(),
-                &ipv6.destination_address().as_ref(),
-                &(ipv6.payload_length() as u32).to_be_bytes().as_ref(),
-                &[0x0, 0x0, 0x0, ipv6.computed_protocol()].as_ref(),
+                ipv6.source_address().as_ref(),
+                ipv6.destination_address().as_ref(),
+                (ipv6.payload_length() as u32).to_be_bytes().as_ref(),
+                [0x0, 0x0, 0x0, ipv6.computed_protocol()].as_ref(),
                 &self.buffer[0..16],
                 &self.buffer[18..],
             ]),
