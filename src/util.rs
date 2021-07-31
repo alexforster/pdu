@@ -39,14 +39,14 @@ fn sum(mut buffer: &[u8]) -> u16 {
     while buffer.len() >= 32 {
         let mut b = &buffer[..32];
         while b.len() >= 2 {
-            accum += u16::from_be_bytes(b[0..=1].try_into().unwrap()) as u32;
+            accum += u16::from_be_bytes(b[0..2].try_into().unwrap()) as u32;
             b = &b[2..];
         }
         buffer = &buffer[32..];
     }
 
     while buffer.len() >= 2 {
-        accum += u16::from_be_bytes(buffer[0..=1].try_into().unwrap()) as u32;
+        accum += u16::from_be_bytes(buffer[0..2].try_into().unwrap()) as u32;
         buffer = &buffer[2..];
     }
 

@@ -69,11 +69,11 @@ impl<'a> ArpPdu<'a> {
     }
 
     pub fn hardware_type(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[0..=1].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[0..2].try_into().unwrap())
     }
 
     pub fn protocol_type(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[2..4].try_into().unwrap())
     }
 
     pub fn hardware_length(&'a self) -> u8 {
@@ -85,7 +85,7 @@ impl<'a> ArpPdu<'a> {
     }
 
     pub fn opcode(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[6..=7].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[6..8].try_into().unwrap())
     }
 
     pub fn sender_hardware_address(&'a self) -> [u8; 6] {

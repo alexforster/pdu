@@ -88,19 +88,19 @@ impl<'a> TcpPdu<'a> {
     }
 
     pub fn source_port(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[0..=1].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[0..2].try_into().unwrap())
     }
 
     pub fn destination_port(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[2..4].try_into().unwrap())
     }
 
     pub fn sequence_number(&'a self) -> u32 {
-        u32::from_be_bytes(self.buffer[4..=7].try_into().unwrap())
+        u32::from_be_bytes(self.buffer[4..8].try_into().unwrap())
     }
 
     pub fn acknowledgement_number(&'a self) -> u32 {
-        u32::from_be_bytes(self.buffer[8..=11].try_into().unwrap())
+        u32::from_be_bytes(self.buffer[8..12].try_into().unwrap())
     }
 
     pub fn data_offset(&'a self) -> u8 {
@@ -148,7 +148,7 @@ impl<'a> TcpPdu<'a> {
     }
 
     pub fn window_size(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[14..=15].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[14..16].try_into().unwrap())
     }
 
     pub fn computed_window_size(&'a self, shift: u8) -> u32 {
@@ -156,7 +156,7 @@ impl<'a> TcpPdu<'a> {
     }
 
     pub fn checksum(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[16..=17].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[16..18].try_into().unwrap())
     }
 
     pub fn computed_checksum(&'a self, ip: &crate::Ip) -> u16 {
@@ -166,7 +166,7 @@ impl<'a> TcpPdu<'a> {
                 &ipv4.destination_address().as_ref(),
                 &[0x00, ipv4.protocol()].as_ref(),
                 &(ipv4.total_length() as usize - ipv4.computed_ihl()).to_be_bytes().as_ref(),
-                &self.buffer[0..=15],
+                &self.buffer[0..16],
                 &self.buffer[18..],
             ]),
             crate::Ip::Ipv6(ipv6) => util::checksum(&[
@@ -174,14 +174,14 @@ impl<'a> TcpPdu<'a> {
                 &ipv6.destination_address().as_ref(),
                 &(ipv6.payload_length() as u32).to_be_bytes().as_ref(),
                 &[0x0, 0x0, 0x0, ipv6.computed_protocol()].as_ref(),
-                &self.buffer[0..=15],
+                &self.buffer[0..16],
                 &self.buffer[18..],
             ]),
         }
     }
 
     pub fn urgent_pointer(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[18..=19].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[18..20].try_into().unwrap())
     }
 
     pub fn options(&'a self) -> TcpOptionIterator<'a> {
@@ -235,16 +235,16 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
             match option {
                 0 => None,
                 1 => Some(TcpOption::NoOp),
-                2 if len == 4 => Some(TcpOption::Mss {
-                    size: u16::from_be_bytes(self.buffer[pos + 2..=pos + 3].try_into().unwrap()),
-                }),
+                2 if len == 4 => {
+                    Some(TcpOption::Mss { size: u16::from_be_bytes(self.buffer[pos + 2..pos + 4].try_into().unwrap()) })
+                }
                 3 if len == 3 => Some(TcpOption::WindowScale { shift: self.buffer[pos + 2] }),
                 4 => Some(TcpOption::SackPermitted),
                 5 if len == 10 => Some(TcpOption::Sack {
                     blocks: [
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 2..pos + 6].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 6..pos + 10].try_into().unwrap()),
                         )),
                         None,
                         None,
@@ -254,12 +254,12 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
                 5 if len == 18 => Some(TcpOption::Sack {
                     blocks: [
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 2..pos + 6].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 6..pos + 10].try_into().unwrap()),
                         )),
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 10..=pos + 13].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 14..=pos + 17].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 10..pos + 14].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 14..pos + 18].try_into().unwrap()),
                         )),
                         None,
                         None,
@@ -268,16 +268,16 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
                 5 if len == 26 => Some(TcpOption::Sack {
                     blocks: [
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 2..pos + 6].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 6..pos + 10].try_into().unwrap()),
                         )),
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 10..=pos + 13].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 14..=pos + 17].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 10..pos + 14].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 14..pos + 18].try_into().unwrap()),
                         )),
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 18..=pos + 21].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 22..=pos + 25].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 18..pos + 22].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 22..pos + 26].try_into().unwrap()),
                         )),
                         None,
                     ],
@@ -285,26 +285,26 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
                 5 if len == 34 => Some(TcpOption::Sack {
                     blocks: [
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 2..pos + 6].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 6..pos + 10].try_into().unwrap()),
                         )),
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 10..=pos + 13].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 14..=pos + 17].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 10..pos + 14].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 14..pos + 18].try_into().unwrap()),
                         )),
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 18..=pos + 21].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 22..=pos + 25].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 18..pos + 22].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 22..pos + 26].try_into().unwrap()),
                         )),
                         Some((
-                            u32::from_be_bytes(self.buffer[pos + 26..=pos + 29].try_into().unwrap()),
-                            u32::from_be_bytes(self.buffer[pos + 30..=pos + 33].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 26..pos + 30].try_into().unwrap()),
+                            u32::from_be_bytes(self.buffer[pos + 30..pos + 34].try_into().unwrap()),
                         )),
                     ],
                 }),
                 8 if len == 10 => Some(TcpOption::Timestamp {
-                    val: u32::from_be_bytes(self.buffer[pos + 2..=pos + 5].try_into().unwrap()),
-                    ecr: u32::from_be_bytes(self.buffer[pos + 6..=pos + 9].try_into().unwrap()),
+                    val: u32::from_be_bytes(self.buffer[pos + 2..pos + 6].try_into().unwrap()),
+                    ecr: u32::from_be_bytes(self.buffer[pos + 6..pos + 10].try_into().unwrap()),
                 }),
                 _ => Some(TcpOption::Raw { option, data: &self.buffer[pos..(pos + len)] }),
             }

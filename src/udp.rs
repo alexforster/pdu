@@ -75,19 +75,19 @@ impl<'a> UdpPdu<'a> {
     }
 
     pub fn source_port(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[0..=1].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[0..2].try_into().unwrap())
     }
 
     pub fn destination_port(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[2..4].try_into().unwrap())
     }
 
     pub fn length(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[4..=5].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[4..6].try_into().unwrap())
     }
 
     pub fn checksum(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[6..=7].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[6..8].try_into().unwrap())
     }
 
     pub fn computed_checksum(&'a self, ip: &crate::Ip) -> u16 {
@@ -97,7 +97,7 @@ impl<'a> UdpPdu<'a> {
                 &ipv4.destination_address().as_ref(),
                 &[0x00, ipv4.protocol()].as_ref(),
                 &self.length().to_be_bytes().as_ref(),
-                &self.buffer[0..=5],
+                &self.buffer[0..6],
                 &self.buffer[8..],
             ]),
             crate::Ip::Ipv6(ipv6) => util::checksum(&[
@@ -105,7 +105,7 @@ impl<'a> UdpPdu<'a> {
                 &ipv6.destination_address().as_ref(),
                 &(self.length() as u32).to_be_bytes().as_ref(),
                 &[0x0, 0x0, 0x0, ipv6.computed_protocol()].as_ref(),
-                &self.buffer[0..=5],
+                &self.buffer[0..6],
                 &self.buffer[8..],
             ]),
         };

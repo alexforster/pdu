@@ -82,18 +82,18 @@ impl<'a> IcmpPdu<'a> {
     }
 
     pub fn checksum(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[2..4].try_into().unwrap())
     }
 
     pub fn computed_checksum(&'a self, ip: &crate::Ip) -> u16 {
         match ip {
-            crate::Ip::Ipv4(_) => util::checksum(&[&self.buffer[0..=1], &self.buffer[4..]]),
+            crate::Ip::Ipv4(_) => util::checksum(&[&self.buffer[0..2], &self.buffer[4..]]),
             crate::Ip::Ipv6(ipv6) => util::checksum(&[
                 &ipv6.source_address().as_ref(),
                 &ipv6.destination_address().as_ref(),
                 &(ipv6.payload_length() as u32).to_be_bytes().as_ref(),
                 &[0x0, 0x0, 0x0, ipv6.computed_protocol()].as_ref(),
-                &self.buffer[0..=1],
+                &self.buffer[0..2],
                 &self.buffer[4..],
             ]),
         }

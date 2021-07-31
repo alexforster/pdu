@@ -119,19 +119,19 @@ impl<'a> EthernetPdu<'a> {
     }
 
     pub fn tpid(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[12..=13].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[12..14].try_into().unwrap())
     }
 
     pub fn ethertype(&'a self) -> u16 {
         match self.tpid() {
-            EtherType::DOT1Q => u16::from_be_bytes(self.buffer[16..=17].try_into().unwrap()),
+            EtherType::DOT1Q => u16::from_be_bytes(self.buffer[16..18].try_into().unwrap()),
             ethertype => ethertype,
         }
     }
 
     pub fn vlan(&'a self) -> Option<u16> {
         match self.tpid() {
-            EtherType::DOT1Q => Some(u16::from_be_bytes(self.buffer[14..=15].try_into().unwrap()) & 0x0FFF),
+            EtherType::DOT1Q => Some(u16::from_be_bytes(self.buffer[14..16].try_into().unwrap()) & 0x0FFF),
             _ => None,
         }
     }

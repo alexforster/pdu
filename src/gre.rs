@@ -108,7 +108,7 @@ impl<'a> GrePdu<'a> {
     }
 
     pub fn ethertype(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[2..4].try_into().unwrap())
     }
 
     pub fn has_checksum(&'a self) -> bool {
@@ -125,7 +125,7 @@ impl<'a> GrePdu<'a> {
 
     pub fn checksum(&'a self) -> Option<u16> {
         if self.has_checksum() {
-            Some(u16::from_be_bytes(self.buffer[4..=5].try_into().unwrap()))
+            Some(u16::from_be_bytes(self.buffer[4..6].try_into().unwrap()))
         } else {
             None
         }
@@ -133,7 +133,7 @@ impl<'a> GrePdu<'a> {
 
     pub fn computed_checksum(&'a self) -> Option<u16> {
         if self.has_checksum() {
-            Some(util::checksum(&[&self.buffer[0..=3], &self.buffer[6..]]))
+            Some(util::checksum(&[&self.buffer[0..4], &self.buffer[6..]]))
         } else {
             None
         }
@@ -141,9 +141,9 @@ impl<'a> GrePdu<'a> {
 
     pub fn key(&'a self) -> Option<u32> {
         if self.has_checksum() && self.has_key() {
-            Some(u32::from_be_bytes(self.buffer[8..=11].try_into().unwrap()))
+            Some(u32::from_be_bytes(self.buffer[8..12].try_into().unwrap()))
         } else if self.has_key() {
-            Some(u32::from_be_bytes(self.buffer[4..=7].try_into().unwrap()))
+            Some(u32::from_be_bytes(self.buffer[4..8].try_into().unwrap()))
         } else {
             None
         }
@@ -151,11 +151,11 @@ impl<'a> GrePdu<'a> {
 
     pub fn sequence_number(&'a self) -> Option<u32> {
         if self.has_sequence_number() && self.has_checksum() && self.has_key() {
-            Some(u32::from_be_bytes(self.buffer[12..=15].try_into().unwrap()))
+            Some(u32::from_be_bytes(self.buffer[12..16].try_into().unwrap()))
         } else if self.has_sequence_number() && (self.has_checksum() || self.has_key()) {
-            Some(u32::from_be_bytes(self.buffer[8..=11].try_into().unwrap()))
+            Some(u32::from_be_bytes(self.buffer[8..12].try_into().unwrap()))
         } else if self.has_sequence_number() {
-            Some(u32::from_be_bytes(self.buffer[4..=7].try_into().unwrap()))
+            Some(u32::from_be_bytes(self.buffer[4..8].try_into().unwrap()))
         } else {
             None
         }
