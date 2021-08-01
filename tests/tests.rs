@@ -206,6 +206,7 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result
             Ipv4::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Gre(gre_pdu) => visit_gre_pdu(&gre_pdu, nodes),
+            Ipv4::Esp(esp_pdu) => visit_esp_pdu(&esp_pdu, nodes),
             Ipv4::EtherIp(etherip_pdu) => visit_ethernet_pdu(&etherip_pdu, nodes),
             Ipv4::IpIp(ipip_pdu) => visit_ipv4_pdu(&ipip_pdu, nodes),
             Ipv4::Ip6In4(ip6in4_pdu) => visit_ipv6_pdu(&ip6in4_pdu, nodes),
@@ -257,6 +258,7 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result
             Ipv6::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Gre(gre_pdu) => visit_gre_pdu(&gre_pdu, nodes),
+            Ipv6::Esp(esp_pdu) => visit_esp_pdu(&esp_pdu, nodes),
             Ipv6::EtherIp(etherip_pdu) => visit_ethernet_pdu(&etherip_pdu, nodes),
             Ipv6::IpIp(ipip_pdu) => visit_ipv6_pdu(&ipip_pdu, nodes),
             Ipv6::Ip4In6(ip4in6_pdu) => visit_ipv4_pdu(&ip4in6_pdu, nodes),
@@ -486,6 +488,25 @@ fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(
             Gre::Ipv4(ipv4_pdu) => visit_ipv4_pdu(&ipv4_pdu, nodes),
             Gre::Ipv6(ipv6_pdu) => visit_ipv6_pdu(&ipv6_pdu, nodes),
         },
+        Err(e) => Err(e.into()),
+    }
+}
+
+fn visit_esp_pdu(pdu: &EspPdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
+    let node = nodes.pop_front().unwrap();
+    if node.attribute("name") == Some("_ws.malformed") {
+        return Err("node: malformed".into());
+    }
+    assert_eq!(node.attribute("name"), Some("esp"));
+
+    assert_eq!(pdu.spi().to_be_bytes(), descendant_value(&node, "esp", "spi", 4)?.as_slice());
+    assert_eq!(pdu.sequence_number().to_be_bytes(), descendant_value(&node, "esp", "sequence", 4)?.as_slice());
+
+    match pdu.inner() {
+        Ok(Esp::Raw(raw)) => {
+            assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
+            Ok(())
+        }
         Err(e) => Err(e.into()),
     }
 }

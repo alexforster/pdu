@@ -38,6 +38,7 @@ The following protocol hierarchy can be parsed with this library:
      * ICMP
      * GREv0
        * ...Ethernet, IPv4, IPv6...
+     * ESP (no decryption)
      * EtherIP
        * ...Ethernet...
      * IPIP
@@ -50,6 +51,7 @@ The following protocol hierarchy can be parsed with this library:
      * ICMPv6
      * GREv0
        * ...Ethernet, IPv4, IPv6...
+     * ESP (no decryption)
      * EtherIP
        * ...Ethernet...
      * IPIP
