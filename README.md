@@ -13,7 +13,7 @@ Small, fast, and correct L2/L3/L4 packet parser.
 
  * Fully-featured `no_std` support
  * No Crate dependencies and no macros
- * Internet protocols only: application-layer protocols are out of scope
+ * Link/internet/transport protocols only: application-layer protocols are out of scope
 
 #### Fast
 
@@ -38,12 +38,24 @@ The following protocol hierarchy can be parsed with this library:
      * ICMP
      * GREv0
        * ...Ethernet, IPv4, IPv6...
+     * EtherIP
+       * ...Ethernet...
+     * IPIP
+       * ...IPv4...
+     * 6in4
+       * ...IPv6...
    * IPv6 (including extension headers)
      * TCP (including options)
      * UDP
      * ICMPv6
      * GREv0
        * ...Ethernet, IPv4, IPv6...
+     * EtherIP
+       * ...Ethernet...
+     * IPIP
+       * ...IPv6...
+     * 4in6
+       * ...IPv4...
 
 In addition, unrecognized upper protocols are accessible as bytes via `Raw`
 enum variants.

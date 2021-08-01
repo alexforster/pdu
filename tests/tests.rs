@@ -206,6 +206,9 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result
             Ipv4::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Gre(gre_pdu) => visit_gre_pdu(&gre_pdu, nodes),
+            Ipv4::EtherIp(etherip_pdu) => visit_ethernet_pdu(&etherip_pdu, nodes),
+            Ipv4::IpIp(ipip_pdu) => visit_ipv4_pdu(&ipip_pdu, nodes),
+            Ipv4::Ip6In4(ip6in4_pdu) => visit_ipv6_pdu(&ip6in4_pdu, nodes),
         },
         Err(e) => Err(e.into()),
     }
@@ -254,6 +257,9 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result
             Ipv6::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Gre(gre_pdu) => visit_gre_pdu(&gre_pdu, nodes),
+            Ipv6::EtherIp(etherip_pdu) => visit_ethernet_pdu(&etherip_pdu, nodes),
+            Ipv6::IpIp(ipip_pdu) => visit_ipv6_pdu(&ipip_pdu, nodes),
+            Ipv6::Ip4In6(ip4in6_pdu) => visit_ipv4_pdu(&ip4in6_pdu, nodes),
         },
         Err(e) => Err(e.into()),
     }

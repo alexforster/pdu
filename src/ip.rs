@@ -28,6 +28,9 @@ pub mod IpProto {
     pub const ICMP: u8 = 1;
     pub const ICMP6: u8 = 58;
     pub const GRE: u8 = 47;
+    pub const ETHER: u8 = 143;
+    pub const IPV4: u8 = 4;
+    pub const IPV6: u8 = 41;
     pub const HOPOPTS: u8 = 0;
     pub const ROUTING: u8 = 43;
     pub const FRAGMENT: u8 = 44;
@@ -69,6 +72,9 @@ pub enum Ipv4<'a> {
     Udp(super::UdpPdu<'a>),
     Icmp(super::IcmpPdu<'a>),
     Gre(super::GrePdu<'a>),
+    EtherIp(super::EthernetPdu<'a>),
+    IpIp(super::Ipv4Pdu<'a>),
+    Ip6In4(super::Ipv6Pdu<'a>),
 }
 
 impl<'a> Ipv4Pdu<'a> {
@@ -131,6 +137,9 @@ impl<'a> Ipv4Pdu<'a> {
                         Ipv4::Raw(rest)
                     }
                 }
+                IpProto::ETHER => Ipv4::EtherIp(super::EthernetPdu::new(rest)?),
+                IpProto::IPV4 => Ipv4::IpIp(super::Ipv4Pdu::new(rest)?),
+                IpProto::IPV6 => Ipv4::Ip6In4(super::Ipv6Pdu::new(rest)?),
                 _ => Ipv4::Raw(rest),
             })
         }
@@ -271,6 +280,9 @@ pub enum Ipv6<'a> {
     Udp(super::UdpPdu<'a>),
     Icmp(super::IcmpPdu<'a>),
     Gre(super::GrePdu<'a>),
+    EtherIp(super::EthernetPdu<'a>),
+    IpIp(super::Ipv6Pdu<'a>),
+    Ip4In6(super::Ipv4Pdu<'a>),
 }
 
 impl<'a> Ipv6Pdu<'a> {
@@ -345,6 +357,9 @@ impl<'a> Ipv6Pdu<'a> {
                         Ipv6::Raw(rest)
                     }
                 }
+                IpProto::ETHER => Ipv6::EtherIp(super::EthernetPdu::new(rest)?),
+                IpProto::IPV6 => Ipv6::IpIp(super::Ipv6Pdu::new(rest)?),
+                IpProto::IPV4 => Ipv6::Ip4In6(super::Ipv4Pdu::new(rest)?),
                 _ => Ipv6::Raw(rest),
             })
         }
