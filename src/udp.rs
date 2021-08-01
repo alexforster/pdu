@@ -70,8 +70,12 @@ impl<'a> UdpPdu<'a> {
 
     /// Consumes this object and returns an object representing the inner payload of this PDU
     pub fn into_inner(self) -> Result<Udp<'a>> {
-        let rest = &self.buffer[8..];
+        let rest = &self.buffer[self.computed_ihl()..];
         Ok(Udp::Raw(rest))
+    }
+
+    pub fn computed_ihl(&'a self) -> usize {
+        8
     }
 
     pub fn source_port(&'a self) -> u16 {
@@ -115,9 +119,5 @@ impl<'a> UdpPdu<'a> {
         }
 
         csum
-    }
-
-    pub fn computed_data_offset(&'a self) -> usize {
-        8
     }
 }

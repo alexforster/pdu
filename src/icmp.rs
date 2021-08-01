@@ -59,7 +59,7 @@ impl<'a> IcmpPdu<'a> {
 
     /// Consumes this object and returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn into_bytes(self) -> &'a [u8] {
-        &self.buffer[0..8]
+        &self.buffer[0..self.computed_ihl()]
     }
 
     /// Returns an object representing the inner payload of this PDU
@@ -69,8 +69,12 @@ impl<'a> IcmpPdu<'a> {
 
     /// Consumes this object and returns an object representing the inner payload of this PDU
     pub fn into_inner(self) -> Result<Icmp<'a>> {
-        let rest = &self.buffer[4..];
+        let rest = &self.buffer[self.computed_ihl()..];
         Ok(Icmp::Raw(rest))
+    }
+
+    pub fn computed_ihl(&'a self) -> usize {
+        8
     }
 
     pub fn message_type(&'a self) -> u8 {
@@ -97,9 +101,5 @@ impl<'a> IcmpPdu<'a> {
                 &self.buffer[4..],
             ]),
         }
-    }
-
-    pub fn computed_data_offset(&'a self) -> usize {
-        4
     }
 }

@@ -392,7 +392,7 @@ fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>
 
     match pdu.inner() {
         Ok(Udp::Raw(raw)) => {
-            assert_eq!(&pdu.buffer()[pdu.computed_data_offset()..], raw);
+            assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
             Ok(())
         }
         Err(e) => Err(e.into()),
@@ -423,7 +423,7 @@ fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Nod
 
     match pdu.inner() {
         Ok(Icmp::Raw(raw)) => {
-            assert_eq!(&pdu.buffer()[pdu.computed_data_offset()..], raw);
+            assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
             Ok(())
         }
         Err(e) => Err(e.into()),
