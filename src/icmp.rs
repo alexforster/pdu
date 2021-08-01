@@ -99,11 +99,6 @@ impl<'a> IcmpPdu<'a> {
         }
     }
 
-    #[deprecated(since = "1.3.0", note = "use IcmpPdu::inner()")]
-    pub fn message(&'a self) -> &'a [u8] {
-        &self.buffer[4..]
-    }
-
     pub fn computed_data_offset(&'a self) -> usize {
         4
     }
