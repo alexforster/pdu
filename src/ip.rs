@@ -28,6 +28,10 @@ pub mod IpProto {
     pub const ICMP: u8 = 1;
     pub const ICMP6: u8 = 58;
     pub const GRE: u8 = 47;
+    pub const HOPOPTS: u8 = 0;
+    pub const ROUTING: u8 = 43;
+    pub const FRAGMENT: u8 = 44;
+    pub const DESTOPTS: u8 = 60;
 }
 
 /// Contains either an [`Ipv4Pdu`] or [`Ipv6Pdu`] depending on address family
@@ -281,7 +285,7 @@ impl<'a> Ipv6Pdu<'a> {
         }
         let mut position = 40;
         let mut next_header = buffer[6];
-        while let 0 | 43 | 44 | 59 | 60 = next_header {
+        while let IpProto::HOPOPTS | IpProto::ROUTING | IpProto::FRAGMENT | IpProto::DESTOPTS = next_header {
             if buffer.len() <= (position + 1) {
                 return Err(Error::Truncated);
             }
@@ -373,7 +377,7 @@ impl<'a> Ipv6Pdu<'a> {
     pub fn computed_ihl(&'a self) -> usize {
         let mut position = 40;
         let mut next_header = self.next_header();
-        while let 0 | 43 | 44 | 59 | 60 = next_header {
+        while let IpProto::HOPOPTS | IpProto::ROUTING | IpProto::FRAGMENT | IpProto::DESTOPTS = next_header {
             next_header = self.buffer[position];
             position += ((self.buffer[position + 1] as usize) + 1) * 8;
         }
@@ -383,7 +387,7 @@ impl<'a> Ipv6Pdu<'a> {
     pub fn computed_protocol(&'a self) -> u8 {
         let mut position = 40;
         let mut next_header = self.next_header();
-        while let 0 | 43 | 44 | 59 | 60 = next_header {
+        while let IpProto::HOPOPTS | IpProto::ROUTING | IpProto::FRAGMENT | IpProto::DESTOPTS = next_header {
             next_header = self.buffer[position];
             position += ((self.buffer[position + 1] as usize) + 1) * 8;
         }
@@ -456,7 +460,7 @@ impl<'a> Iterator for Ipv6ExtensionHeaderIterator<'a> {
     type Item = Ipv6ExtensionHeader<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let 0 | 43 | 44 | 59 | 60 = self.next_header {
+        if let IpProto::HOPOPTS | IpProto::ROUTING | IpProto::FRAGMENT | IpProto::DESTOPTS = self.next_header {
             let header = self.next_header;
             self.next_header = self.buffer[self.pos];
             let header_length = ((self.buffer[self.pos + 1] as usize) + 1) * 8;
