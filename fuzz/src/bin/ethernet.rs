@@ -24,9 +24,15 @@ pub fn fuzz(data: &[u8]) {
         ethernet_pdu.destination_address();
         ethernet_pdu.source_address();
         ethernet_pdu.ethertype();
-        ethernet_pdu.vlan();
-        ethernet_pdu.vlan_pcp();
-        ethernet_pdu.vlan_dei();
+        ethernet_pdu.computed_ethertype();
+        if let Some(vlan_tags) = ethernet_pdu.vlan_tags() {
+            for vlan_tag in vlan_tags {
+                vlan_tag.protocol_id;
+                vlan_tag.priority_codepoint;
+                vlan_tag.drop_eligible;
+                vlan_tag.id;
+            }
+        }
     }
 }
 

@@ -30,7 +30,7 @@ Small, fast, and correct L2/L3/L4 packet parser.
 
 The following protocol hierarchy can be parsed with this library:
 
- * Ethernet (including vlan)
+ * Ethernet (including vlan/QinQ)
    * ARP
    * IPv4 (including options)
      * TCP (including options)

@@ -27,6 +27,7 @@ pub mod EtherType {
     pub const IPV4: u16 = 0x0800;
     pub const IPV6: u16 = 0x86DD;
     pub const DOT1Q: u16 = 0x8100;
+    pub const QINQ: u16 = 0x88A8;
     pub const TEB: u16 = 0x6558;
 }
 
@@ -48,17 +49,24 @@ pub enum Ethernet<'a> {
 impl<'a> EthernetPdu<'a> {
     /// Constructs an [`EthernetPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
-        if buffer.len() < 14 {
+        if buffer.len() < 12 {
             return Err(Error::Truncated);
+        }
+        let mut pos = 12;
+        loop {
+            if buffer.len() < pos + 2 {
+                return Err(Error::Truncated);
+            }
+            let ethertype = u16::from_be_bytes(buffer[pos..pos + 2].try_into().unwrap());
+            if ethertype != EtherType::DOT1Q && ethertype != EtherType::QINQ {
+                break;
+            }
+            if buffer.len() < pos + 4 {
+                return Err(Error::Truncated);
+            }
+            pos += 4;
         }
         let pdu = EthernetPdu { buffer };
-        if pdu.tpid() == EtherType::DOT1Q && buffer.len() < 18 {
-            return Err(Error::Truncated);
-        }
-        if pdu.ethertype() < 0x0600 {
-            // we don't support 802.3 (LLC) frames
-            return Err(Error::Malformed);
-        }
         Ok(pdu)
     }
 
@@ -91,7 +99,7 @@ impl<'a> EthernetPdu<'a> {
     /// Consumes this object and returns an object representing the inner payload of this PDU
     pub fn into_inner(self) -> Result<Ethernet<'a>> {
         let rest = &self.buffer[self.computed_ihl()..];
-        Ok(match self.ethertype() {
+        Ok(match self.computed_ethertype() {
             EtherType::ARP => Ethernet::Arp(super::ArpPdu::new(rest)?),
             EtherType::IPV4 => Ethernet::Ipv4(super::Ipv4Pdu::new(rest)?),
             EtherType::IPV6 => Ethernet::Ipv6(super::Ipv6Pdu::new(rest)?),
@@ -100,10 +108,15 @@ impl<'a> EthernetPdu<'a> {
     }
 
     pub fn computed_ihl(&'a self) -> usize {
-        match self.tpid() {
-            EtherType::DOT1Q => 18,
-            _ => 14,
+        let mut pos = 12;
+        loop {
+            let ethertype = u16::from_be_bytes(self.buffer[pos..pos + 2].try_into().unwrap());
+            if ethertype != EtherType::DOT1Q && ethertype != EtherType::QINQ {
+                break;
+            }
+            pos += 4;
         }
+        pos
     }
 
     pub fn source_address(&'a self) -> [u8; 6] {
@@ -118,35 +131,66 @@ impl<'a> EthernetPdu<'a> {
         destination_address
     }
 
-    pub fn tpid(&'a self) -> u16 {
+    pub fn ethertype(&'a self) -> u16 {
         u16::from_be_bytes(self.buffer[12..14].try_into().unwrap())
     }
 
-    pub fn ethertype(&'a self) -> u16 {
-        match self.tpid() {
-            EtherType::DOT1Q => u16::from_be_bytes(self.buffer[16..18].try_into().unwrap()),
-            ethertype => ethertype,
+    pub fn computed_ethertype(&'a self) -> u16 {
+        let mut pos = 12;
+        loop {
+            let ethertype = u16::from_be_bytes(self.buffer[pos..pos + 2].try_into().unwrap());
+            if ethertype != EtherType::DOT1Q && ethertype != EtherType::QINQ {
+                return ethertype;
+            }
+            pos += 4;
         }
     }
 
-    pub fn vlan(&'a self) -> Option<u16> {
-        match self.tpid() {
-            EtherType::DOT1Q => Some(u16::from_be_bytes(self.buffer[14..16].try_into().unwrap()) & 0x0FFF),
+    pub fn vlan_tags(&'a self) -> Option<VlanTagIterator<'a>> {
+        match self.ethertype() {
+            EtherType::DOT1Q | EtherType::QINQ => Some(VlanTagIterator { buffer: self.buffer, pos: 12, eol: false }),
             _ => None,
         }
     }
+}
 
-    pub fn vlan_pcp(&'a self) -> Option<u8> {
-        match self.tpid() {
-            EtherType::DOT1Q => Some((self.buffer[14] & 0xE0) >> 5),
-            _ => None,
-        }
-    }
+/// Represents a VLAN tag
+#[derive(Debug, Copy, Clone)]
+pub struct VlanTag {
+    pub protocol_id: u16,
+    pub priority_codepoint: u8,
+    pub drop_eligible: bool,
+    pub id: u16,
+}
 
-    pub fn vlan_dei(&'a self) -> Option<bool> {
-        match self.tpid() {
-            EtherType::DOT1Q => Some(((self.buffer[14] & 0x10) >> 4) > 0),
-            _ => None,
+#[derive(Debug, Copy, Clone)]
+pub struct VlanTagIterator<'a> {
+    buffer: &'a [u8],
+    pos: usize,
+    eol: bool,
+}
+
+impl<'a> Iterator for VlanTagIterator<'a> {
+    type Item = VlanTag;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.eol {
+            return None;
         }
+        let tpid = u16::from_be_bytes(self.buffer[self.pos..self.pos + 2].try_into().unwrap());
+        if tpid != EtherType::DOT1Q && tpid != EtherType::QINQ {
+            return None;
+        }
+        if tpid == EtherType::DOT1Q {
+            self.eol = true;
+        }
+        let vlan_tag = VlanTag {
+            protocol_id: tpid,
+            priority_codepoint: (self.buffer[self.pos + 2] & 0xE0) >> 5,
+            drop_eligible: ((self.buffer[self.pos + 2] & 0x10) >> 4) > 0,
+            id: u16::from_be_bytes([self.buffer[self.pos + 2] & 0x0F, self.buffer[self.pos + 3]]),
+        };
+        self.pos += 4;
+        Some(vlan_tag)
     }
 }
