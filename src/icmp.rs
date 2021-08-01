@@ -107,4 +107,8 @@ impl<'a> IcmpPdu<'a> {
     pub fn computed_data_offset(&'a self) -> usize {
         4
     }
+
+    pub fn rest(&'a self) -> &'a [u8] {
+        &self.buffer[4..8]
+    }
 }
