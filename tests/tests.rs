@@ -93,21 +93,30 @@ fn visit_ethernet_pdu(pdu: &EthernetPdu, mut nodes: VecDeque<roxmltree::Node>) -
 
     assert_eq!(pdu.destination_address().as_ref(), descendant_value(&node, "eth", "dst", 6)?.as_slice());
     assert_eq!(pdu.source_address().as_ref(), descendant_value(&node, "eth", "src", 6)?.as_slice());
-    assert_eq!(&pdu.tpid().to_be_bytes(), descendant_value(&node, "eth", "type", 2)?.as_slice());
+    assert_eq!(&pdu.ethertype().to_be_bytes(), descendant_value(&node, "eth", "type", 2)?.as_slice());
 
-    if node.next_sibling_element().and_then(|sibling| sibling.attribute("name")) == Some("vlan") {
+    let mut vlan_count = 0;
+    for _ in node.next_siblings().take_while(|n| n.attribute("name") == Some("vlan")) {
+        vlan_count += 1;
+    }
+
+    let vlan_tags = pdu.vlan_tags();
+    let mut last_etype = None;
+    for _ in 0..vlan_count {
         let node = nodes.pop_front().unwrap();
         assert_eq!(node.attribute("name"), Some("vlan"));
-
-        assert_eq!(&pdu.vlan().unwrap().to_be_bytes(), descendant_value(&node, "vlan", "id", 2)?.as_slice());
-        assert_eq!(&pdu.vlan_pcp().unwrap().to_be_bytes(), descendant_value(&node, "vlan", "priority", 1)?.as_slice());
+        let vlan_tag = vlan_tags.unwrap().next().unwrap();
+        assert_eq!(&vlan_tag.protocol_id.to_be_bytes(), descendant_value(&node, "vlan", "etype", 1)?.as_slice());
+        last_etype = Some(vlan_tag.protocol_id.to_be_bytes());
         assert_eq!(
-            (pdu.vlan_dei().unwrap() as u8).to_be_bytes(),
-            descendant_value(&node, "vlan", "dei", 1)?.as_slice()
+            &vlan_tag.priority_codepoint.to_be_bytes(),
+            descendant_value(&node, "vlan", "priority", 1)?.as_slice()
         );
-        assert_eq!(&pdu.ethertype().to_be_bytes(), descendant_value(&node, "vlan", "etype", 2)?.as_slice());
-    } else {
-        assert_eq!(&pdu.ethertype().to_be_bytes(), descendant_value(&node, "eth", "type", 2)?.as_slice());
+        assert_eq!((vlan_tag.drop_eligible as u8).to_be_bytes(), descendant_value(&node, "vlan", "dei", 1)?.as_slice());
+    }
+
+    if let Some(last_etype) = last_etype {
+        assert_eq!(&last_etype, descendant_value(&node, "vlan", "id", 2)?.as_slice());
     }
 
     match pdu.inner() {
