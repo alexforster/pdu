@@ -363,7 +363,13 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>
 
     assert!(options.is_empty());
 
-    Ok(())
+    match pdu.inner() {
+        Ok(Tcp::Raw(raw)) => {
+            assert_eq!(&pdu.buffer()[pdu.computed_data_offset()..], raw);
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
@@ -384,7 +390,13 @@ fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>
         );
     }
 
-    Ok(())
+    match pdu.inner() {
+        Ok(Udp::Raw(raw)) => {
+            assert_eq!(&pdu.buffer()[pdu.computed_data_offset()..], raw);
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
@@ -409,7 +421,13 @@ fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Nod
         );
     }
 
-    Ok(())
+    match pdu.inner() {
+        Ok(Icmp::Raw(raw)) => {
+            assert_eq!(&pdu.buffer()[pdu.computed_data_offset()..], raw);
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
