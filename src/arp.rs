@@ -29,19 +29,11 @@ pub struct ArpPdu<'a> {
 impl<'a> ArpPdu<'a> {
     /// Constructs an [`ArpPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
-        if buffer.len() < 12 {
+        if buffer.len() < 8 {
             return Err(Error::Truncated);
         }
         let pdu = ArpPdu { buffer };
-        if pdu.hardware_length() != 6 {
-            // we only support 6-octet hardware addresses
-            return Err(Error::Malformed);
-        }
-        if pdu.protocol_length() != 4 {
-            // we only support 4-octet protocol addresses
-            return Err(Error::Malformed);
-        }
-        if buffer.len() < 28 {
+        if buffer.len() < 8 + (pdu.hardware_length() as usize * 2) + (pdu.protocol_length() as usize * 2) {
             return Err(Error::Truncated);
         }
         Ok(pdu)
@@ -65,7 +57,7 @@ impl<'a> ArpPdu<'a> {
 
     /// Consumes this object and returns the slice of the underlying buffer that contains this PDU
     pub fn into_bytes(self) -> &'a [u8] {
-        &self.buffer[0..28]
+        &self.buffer[0..8 + (self.hardware_length() as usize * 2) + (self.protocol_length() as usize * 2)]
     }
 
     pub fn hardware_type(&'a self) -> u16 {
@@ -88,27 +80,29 @@ impl<'a> ArpPdu<'a> {
         u16::from_be_bytes(self.buffer[6..8].try_into().unwrap())
     }
 
-    pub fn sender_hardware_address(&'a self) -> [u8; 6] {
-        let mut sender_hardware_address = [0u8; 6];
-        sender_hardware_address.copy_from_slice(&self.buffer[8..14]);
-        sender_hardware_address
+    pub fn sender_hardware_address(&'a self) -> &'a [u8] {
+        let start = 8 as usize;
+        let end = start + self.hardware_length() as usize;
+        &self.buffer[start..end]
     }
 
-    pub fn sender_protocol_address(&'a self) -> [u8; 4] {
-        let mut sender_protocol_address = [0u8; 4];
-        sender_protocol_address.copy_from_slice(&self.buffer[14..18]);
-        sender_protocol_address
+    pub fn sender_protocol_address(&'a self) -> &'a [u8] {
+        let start = 8 + self.hardware_length() as usize;
+        let end = start + self.protocol_length() as usize;
+        &self.buffer[start..end]
     }
 
-    pub fn target_hardware_address(&'a self) -> [u8; 6] {
-        let mut target_hardware_address = [0u8; 6];
-        target_hardware_address.copy_from_slice(&self.buffer[18..24]);
-        target_hardware_address
+    pub fn target_hardware_address(&'a self) -> &'a [u8] {
+        let start = 8 + self.hardware_length() as usize + self.protocol_length() as usize;
+        let end = start + self.hardware_length() as usize;
+        &self.buffer[start..end]
     }
 
-    pub fn target_protocol_address(&'a self) -> [u8; 4] {
-        let mut target_protocol_address = [0u8; 4];
-        target_protocol_address.copy_from_slice(&self.buffer[24..28]);
-        target_protocol_address
+    pub fn target_protocol_address(&'a self) -> &'a [u8] {
+        let start = 8 + (self.hardware_length() as usize * 2) + self.protocol_length() as usize;
+        let end = start + self.protocol_length() as usize;
+        &self.buffer[start..end]
+    }
+}
     }
 }
