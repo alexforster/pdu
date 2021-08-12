@@ -85,3 +85,29 @@ impl<'a> EspPdu<'a> {
         u32::from_be_bytes(self.buffer[4..8].try_into().unwrap())
     }
 }
+
+/// Represents an [`EspPdu`] builder
+#[derive(Debug)]
+pub struct EspPduBuilder<'a> {
+    buffer: &'a mut [u8],
+}
+
+impl<'a> EspPduBuilder<'a> {
+    /// Constructs an [`EspPduBuilder`] backed by the provided `buffer`
+    pub fn new(buffer: &'a mut [u8]) -> Result<Self> {
+        if buffer.len() < 8 {
+            return Err(Error::Truncated);
+        }
+        buffer.fill(0);
+        let pdu = EspPduBuilder { buffer };
+        Ok(pdu)
+    }
+
+    pub fn inner(mut self, inner: Esp) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn build(mut self) -> Result<EspPdu<'a>> {
+        EspPdu::new(self.buffer)
+    }
+}

@@ -269,6 +269,91 @@ impl<'a> Iterator for Ipv4OptionIterator<'a> {
     }
 }
 
+/// Represents an [`Ipv4Pdu`] builder
+#[derive(Debug)]
+pub struct Ipv4PduBuilder<'a> {
+    buffer: &'a mut [u8],
+}
+
+impl<'a> Ipv4PduBuilder<'a> {
+    /// Constructs an [`Ipv4Pdu`] backed by the provided `buffer`
+    pub fn new(buffer: &'a mut [u8]) -> Result<Self> {
+        if buffer.len() < 20 {
+            return Err(Error::Truncated);
+        }
+        buffer.fill(0);
+        let pdu = Ipv4PduBuilder { buffer };
+        Ok(pdu)
+    }
+
+    pub fn dscp(mut self, dscp: u8) -> Self {
+        self.buffer[1] = self.buffer[1] & ((dscp & 0x3f) << 2);
+        self
+    }
+
+    pub fn ecn(mut self, ecn: u8) -> Self {
+        self.buffer[1] = self.buffer[1] & (ecn & 0x3);
+        self
+    }
+
+    pub fn identification(mut self, identification: u16) -> Self {
+        &mut self.buffer[4..6].copy_from_slice(&identification.to_be_bytes());
+        self
+    }
+
+    pub fn dont_fragment(mut self) -> Self {
+        self.buffer[6] &= 0x40;
+        self
+    }
+
+    pub fn more_fragments(mut self) -> Self {
+        self.buffer[6] &= 0x40;
+        self
+    }
+
+    pub fn fragment_offset(mut self, fragment_offset: u16) -> Result<Self> {
+        if fragment_offset % 8 != 0 {
+            return Err(Error::Malformed);
+        }
+        let fo = (fragment_offset >> 3).to_be_bytes();
+        self.buffer[6] &= fo[0];
+        self.buffer[7] = fo[1];
+        Ok(self)
+    }
+
+    pub fn ttl(mut self, ttl: u8) -> Self {
+        self.buffer[8] = ttl;
+        self
+    }
+
+    pub fn protocol(mut self, protocol: u8) -> Self {
+        self.buffer[9] = protocol;
+        self
+    }
+
+    pub fn source_address(mut self, source_address: [u8; 4]) -> Self {
+        &mut self.buffer[12..16].copy_from_slice(&source_address);
+        self
+    }
+
+    pub fn destination_address(mut self, destination_address: [u8; 4]) -> Self {
+        &mut self.buffer[16..20].copy_from_slice(&destination_address);
+        self
+    }
+
+    pub fn option(mut self, option: Ipv4Option) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn inner(mut self, inner: Ipv4) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn build(mut self) -> Result<Ipv4Pdu<'a>> {
+        Ipv4Pdu::new(self.buffer)
+    }
+}
+
 /// Represents an IPv6 header and payload
 #[derive(Debug, Copy, Clone)]
 pub struct Ipv6Pdu<'a> {
@@ -502,5 +587,35 @@ impl<'a> Iterator for Ipv6ExtensionHeaderIterator<'a> {
         } else {
             None
         }
+    }
+}
+
+/// Represents an [`Ipv6Pdu`] builder
+#[derive(Debug)]
+pub struct Ipv6PduBuilder<'a> {
+    buffer: &'a mut [u8],
+}
+
+impl<'a> Ipv6PduBuilder<'a> {
+    /// Constructs an [`Ipv6Pdu`] backed by the provided `buffer`
+    pub fn new(buffer: &'a mut [u8]) -> Result<Self> {
+        if buffer.len() < 40 {
+            return Err(Error::Truncated);
+        }
+        buffer.fill(0);
+        let pdu = Ipv6PduBuilder { buffer };
+        Ok(pdu)
+    }
+
+    pub fn extension_header(mut self, extension_header: Ipv6ExtensionHeader) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn inner(mut self, inner: Ipv6) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn build(mut self) -> Result<Ipv6Pdu<'a>> {
+        Ipv6Pdu::new(self.buffer)
     }
 }

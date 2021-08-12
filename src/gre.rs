@@ -161,3 +161,29 @@ impl<'a> GrePdu<'a> {
         }
     }
 }
+
+/// Represents a [`GrePdu`] builder
+#[derive(Debug)]
+pub struct GrePduBuilder<'a> {
+    buffer: &'a mut [u8],
+}
+
+impl<'a> GrePduBuilder<'a> {
+    /// Constructs a [`GrePduBuilder`] backed by the provided `buffer`
+    pub fn new(buffer: &'a mut [u8]) -> Result<Self> {
+        if buffer.len() < 4 {
+            return Err(Error::Truncated);
+        }
+        buffer.fill(0);
+        let pdu = GrePduBuilder { buffer };
+        Ok(pdu)
+    }
+
+    pub fn inner(mut self, inner: Gre) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn build(mut self) -> Result<GrePdu<'a>> {
+        GrePdu::new(self.buffer)
+    }
+}

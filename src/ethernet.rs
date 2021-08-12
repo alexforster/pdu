@@ -194,3 +194,33 @@ impl<'a> Iterator for VlanTagIterator<'a> {
         Some(vlan_tag)
     }
 }
+
+/// Represents an [`EthernetPdu`] builder
+#[derive(Debug)]
+pub struct EthernetPduBuilder<'a> {
+    buffer: &'a mut [u8],
+}
+
+impl<'a> EthernetPduBuilder<'a> {
+    /// Constructs an [`EthernetPduBuilder`] backed by the provided `buffer`
+    pub fn new(buffer: &'a mut [u8]) -> Result<Self> {
+        if buffer.len() < 12 {
+            return Err(Error::Truncated);
+        }
+        buffer.fill(0);
+        let pdu = EthernetPduBuilder { buffer };
+        Ok(pdu)
+    }
+
+    pub fn vlan_tag(mut self, vlan_tag: VlanTag) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn inner(mut self, inner: Ethernet) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn build(mut self) -> Result<EthernetPdu<'a>> {
+        EthernetPdu::new(self.buffer)
+    }
+}

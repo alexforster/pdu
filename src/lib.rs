@@ -16,33 +16,35 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
-//! Small, fast, and correct L2/L3/L4 packet parser
+//! Small, fast, and correct packet builder and parser
 
 #![cfg_attr(not(any(feature = "std", test)), no_std)]
 
 mod ethernet;
-pub use ethernet::{EtherType, Ethernet, EthernetPdu};
+pub use ethernet::{EtherType, Ethernet, EthernetPdu, EthernetPduBuilder};
 
 mod arp;
-pub use arp::ArpPdu;
+pub use arp::{ArpPdu, ArpPduBuilder};
 
 mod ip;
-pub use ip::{Ip, IpProto, Ipv4, Ipv4Option, Ipv4Pdu, Ipv6, Ipv6ExtensionHeader, Ipv6Pdu};
+pub use ip::{Ip, IpProto};
+pub use ip::{Ipv4, Ipv4Option, Ipv4Pdu, Ipv4PduBuilder};
+pub use ip::{Ipv6, Ipv6ExtensionHeader, Ipv6Pdu, Ipv6PduBuilder};
 
 mod tcp;
-pub use tcp::{Tcp, TcpFlag, TcpOption, TcpPdu};
+pub use tcp::{Tcp, TcpFlag, TcpOption, TcpPdu, TcpPduBuilder};
 
 mod udp;
-pub use udp::{Udp, UdpPdu};
+pub use udp::{Udp, UdpPdu, UdpPduBuilder};
 
 mod icmp;
-pub use icmp::{Icmp, IcmpPdu};
+pub use icmp::{Icmp, IcmpPdu, IcmpPduBuilder};
 
 mod gre;
-pub use gre::{Gre, GrePdu};
+pub use gre::{Gre, GrePdu, GrePduBuilder};
 
 mod esp;
-pub use esp::{Esp, EspPdu};
+pub use esp::{Esp, EspPdu, EspPduBuilder};
 
 mod util;
 
@@ -63,8 +65,8 @@ impl std::error::Error for Error {}
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::Truncated => f.write_str("frame is truncated"),
-            Error::Malformed => f.write_str("frame is malformed"),
+            Error::Truncated => f.write_str("truncated"),
+            Error::Malformed => f.write_str("malformed"),
         }
     }
 }

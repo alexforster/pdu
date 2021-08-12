@@ -121,3 +121,29 @@ impl<'a> UdpPdu<'a> {
         csum
     }
 }
+
+/// Represents a [`UdpPdu`] builder
+#[derive(Debug)]
+pub struct UdpPduBuilder<'a> {
+    buffer: &'a mut [u8],
+}
+
+impl<'a> UdpPduBuilder<'a> {
+    /// Constructs a [`UdpPduBuilder`] backed by the provided `buffer`
+    pub fn new(buffer: &'a mut [u8]) -> Result<Self> {
+        if buffer.len() < 8 {
+            return Err(Error::Truncated);
+        }
+        buffer.fill(0);
+        let pdu = UdpPduBuilder { buffer };
+        Ok(pdu)
+    }
+
+    pub fn inner(mut self, inner: Udp) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn build(mut self) -> Result<UdpPdu<'a>> {
+        UdpPdu::new(self.buffer)
+    }
+}

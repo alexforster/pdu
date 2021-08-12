@@ -104,5 +104,25 @@ impl<'a> ArpPdu<'a> {
         &self.buffer[start..end]
     }
 }
+
+/// Represents an [`ArpPdu`] builder
+#[derive(Debug)]
+pub struct ArpPduBuilder<'a> {
+    buffer: &'a mut [u8],
+}
+
+impl<'a> ArpPduBuilder<'a> {
+    /// Constructs an [`ArpPduBuilder`] backed by the provided `buffer`
+    pub fn new(buffer: &'a mut [u8]) -> Result<Self> {
+        if buffer.len() < 8 {
+            return Err(Error::Truncated);
+        }
+        buffer.fill(0);
+        let pdu = ArpPduBuilder { buffer };
+        Ok(pdu)
+    }
+
+    pub fn build(mut self) -> Result<ArpPdu<'a>> {
+        ArpPdu::new(self.buffer)
     }
 }

@@ -1,19 +1,19 @@
 # pdu
 
-Small, fast, and correct L2/L3/L4 packet parser.
+Small, fast, and correct packet builder and parser.
 
 **Author:** Alex Forster \<alex@alexforster.com\><br/>
 **License:** Apache-2.0
 
-[![build status](https://travis-ci.org/alexforster/pdu.svg?branch=master)](https://travis-ci.org/alexforster/pdu)
+[![build status](https://travis-ci.com/alexforster/pdu.svg?branch=master)](https://travis-ci.com/github/alexforster/pdu)
 [![crates.io version](https://img.shields.io/crates/v/pdu.svg)](https://crates.io/crates/pdu)
 [![docs.rs](https://docs.rs/pdu/badge.svg)](https://docs.rs/pdu)
 
 #### Small
 
  * Fully-featured `no_std` support
- * No Crate dependencies and no macros
- * Link/internet/transport protocols only: application-layer protocols are out of scope
+ * No runtime dependencies and no macros
+ * Only link, internet, and transport protocols; application-layer protocols are out of scope
 
 #### Fast
 
@@ -28,7 +28,7 @@ Small, fast, and correct L2/L3/L4 packet parser.
 
 ## Supported Protocols
 
-The following protocol hierarchy can be parsed with this library:
+The following protocol hierarchy can be built and parsed with this library:
 
  * Ethernet (including vlan/QinQ)
    * ARP
@@ -59,7 +59,7 @@ The following protocol hierarchy can be parsed with this library:
      * 4in6
        * ...IPv4...
 
-In addition, unrecognized upper protocols are accessible as bytes via `Raw`
+In addition, unrecognized upper protocols are supported as bytes via `Raw`
 enum variants.
 
 ## Getting Started
@@ -68,7 +68,7 @@ enum variants.
 
 ```toml
 [dependencies]
-pdu = "1.1"
+pdu = "2"
 ```
 
 #### Examples

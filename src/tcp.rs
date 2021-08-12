@@ -16,7 +16,7 @@
    SPDX-License-Identifier: Apache-2.0
 */
 
-use core::convert::TryInto;
+use core::convert::{TryFrom, TryInto};
 
 use crate::{util, Error, Result};
 
@@ -311,5 +311,120 @@ impl<'a> Iterator for TcpOptionIterator<'a> {
         } else {
             None
         }
+    }
+}
+
+/// Represents a [`TcpPdu`] builder
+#[derive(Debug)]
+pub struct TcpPduBuilder<'a> {
+    buffer: &'a mut [u8],
+}
+
+impl<'a> TcpPduBuilder<'a> {
+    /// Constructs a [`TcpPduBuilder`] backed by the provided `buffer`
+    pub fn new(buffer: &'a mut [u8]) -> Result<Self> {
+        if buffer.len() < 20 {
+            return Err(Error::Truncated);
+        }
+        buffer.fill(0);
+        let pdu = TcpPduBuilder { buffer };
+        Ok(pdu)
+    }
+
+    pub fn source_port(mut self, source_port: u16) -> Self {
+        &mut self.buffer[0..2].copy_from_slice(&source_port.to_be_bytes());
+        self
+    }
+
+    pub fn destination_port(mut self, destination_port: u16) -> Self {
+        &mut self.buffer[2..4].copy_from_slice(&destination_port.to_be_bytes());
+        self
+    }
+
+    pub fn sequence_number(mut self, sequence_number: u16) -> Self {
+        &mut self.buffer[4..8].copy_from_slice(&sequence_number.to_be_bytes());
+        self
+    }
+
+    pub fn acknowledgement_number(mut self, acknowledgement_number: u16) -> Self {
+        &mut self.buffer[8..12].copy_from_slice(&acknowledgement_number.to_be_bytes());
+        self
+    }
+
+    pub fn flags(mut self, flags: u8) -> Self {
+        self.buffer[13] = flags;
+        self
+    }
+
+    pub fn fin(mut self) -> Self {
+        self.buffer[13] |= TcpFlag::FIN;
+        self
+    }
+
+    pub fn syn(mut self) -> Self {
+        self.buffer[13] |= TcpFlag::FIN;
+        self
+    }
+
+    pub fn rst(mut self) -> Self {
+        self.buffer[13] |= TcpFlag::RST;
+        self
+    }
+
+    pub fn psh(mut self) -> Self {
+        self.buffer[13] |= TcpFlag::RST;
+        self
+    }
+
+    pub fn ack(mut self) -> Self {
+        self.buffer[13] |= TcpFlag::ACK;
+        self
+    }
+
+    pub fn urg(mut self) -> Self {
+        self.buffer[13] |= TcpFlag::URG;
+        self
+    }
+
+    pub fn ecn(mut self) -> Self {
+        self.buffer[13] |= TcpFlag::ECN;
+        self
+    }
+
+    pub fn cwr(mut self) -> Self {
+        self.buffer[13] |= TcpFlag::CWR;
+        self
+    }
+
+    pub fn window_size(mut self, window_size: usize, window_scale: u8) -> Result<Self> {
+        if window_scale > 14 {
+            return Err(Error::Malformed);
+        }
+        if window_scale > 0 && window_size % window_scale as usize != 0 {
+            return Err(Error::Malformed);
+        }
+        if window_size >> window_scale > u16::MAX as usize {
+            return Err(Error::Malformed);
+        }
+        let scaled_window_size = u16::try_from(window_size >> window_scale as usize).unwrap();
+        &mut self.buffer[14..16].copy_from_slice(&scaled_window_size.to_be_bytes());
+        Ok(self)
+    }
+
+    pub fn urgent_pointer(mut self, urgent_pointer: u16) -> Self {
+        &mut self.buffer[18..20].copy_from_slice(&urgent_pointer.to_be_bytes());
+        self
+    }
+
+    pub fn option(mut self, option: TcpOption) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn inner(mut self, inner: Tcp) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn build(mut self) -> Result<TcpPdu<'a>> {
+        TcpPdu::new(self.buffer)
     }
 }
