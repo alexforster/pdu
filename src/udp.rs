@@ -91,7 +91,7 @@ impl<'a> UdpPdu<'a> {
     }
 
     pub fn computed_checksum(&'a self, ip: &crate::Ip) -> u16 {
-        match ip {
+        let mut csum = match ip {
             crate::Ip::Ipv4(ipv4) => util::checksum(&[
                 &ipv4.source_address().as_ref(),
                 &ipv4.destination_address().as_ref(),
@@ -108,7 +108,13 @@ impl<'a> UdpPdu<'a> {
                 &self.buffer[0..=5],
                 &self.buffer[8..],
             ]),
+        };
+
+        if csum == 0 {
+            csum = 0xFFFF;
         }
+
+        csum
     }
 
     pub fn computed_data_offset(&'a self) -> usize {
