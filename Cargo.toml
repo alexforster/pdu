@@ -1,6 +1,6 @@
 [package]
 name = "pdu"
-version = "1.4.1"
+version = "1.4.2"
 description = "Small, fast, and correct L2/L3/L4 packet parser."
 readme = "README.md"
 authors = ["Alex Forster <alex@alexforster.com>"]
@@ -22,7 +22,7 @@ std = []
 [dev-dependencies]
 base16 = { version = "~0.2" }
 roxmltree = { version = "~0.14", features = ["std"] }
-pcap = { version = "~0.8" }
+pcap = { version = "~0.9" }
 
 [workspace]
 members = [
