@@ -109,12 +109,19 @@ impl<'a> EthernetPdu<'a> {
 
     pub fn computed_ihl(&'a self) -> usize {
         let mut pos = 12;
+        let mut first_iter = false;
         loop {
             let ethertype = u16::from_be_bytes(self.buffer[pos..pos + 2].try_into().unwrap());
             if ethertype != EtherType::DOT1Q && ethertype != EtherType::QINQ {
-                break;
+                if !first_iter {
+                    return pos + 2;
+                }
+                break
             }
             pos += 4;
+            if !first_iter {
+                first_iter = true
+            }
         }
         pos
     }
