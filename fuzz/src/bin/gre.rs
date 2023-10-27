@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2019 Alex Forster <alex@alexforster.com>
+   Copyright (c) Alex Forster <alex@alexforster.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -19,24 +19,21 @@
 use pdu::*;
 
 pub fn fuzz(data: &[u8]) {
-    match GrePdu::new(&data) {
-        Ok(gre_pdu) => {
-            gre_pdu.computed_ihl();
-            gre_pdu.version();
-            gre_pdu.ethertype();
-            gre_pdu.checksum();
-            gre_pdu.computed_checksum();
-            gre_pdu.key();
-            gre_pdu.sequence_number();
-        }
-        Err(_) => {}
+    if let Ok(gre_pdu) = GrePdu::new(data) {
+        gre_pdu.computed_ihl();
+        gre_pdu.version();
+        gre_pdu.ethertype();
+        gre_pdu.checksum();
+        gre_pdu.computed_checksum();
+        gre_pdu.key();
+        gre_pdu.sequence_number();
     }
 }
 
 fn main() {
     loop {
         honggfuzz::fuzz!(|data: &[u8]| {
-            fuzz(&data);
+            fuzz(data);
         });
     }
 }

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2019 Alex Forster <alex@alexforster.com>
+   Copyright (c) Alex Forster <alex@alexforster.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ pub mod EtherType {
     pub const IPV4: u16 = 0x0800;
     pub const IPV6: u16 = 0x86DD;
     pub const DOT1Q: u16 = 0x8100;
+    pub const QINQ: u16 = 0x88A8;
     pub const TEB: u16 = 0x6558;
 }
 
@@ -34,6 +35,7 @@ pub mod EtherType {
 #[derive(Debug, Copy, Clone)]
 pub struct EthernetPdu<'a> {
     buffer: &'a [u8],
+    ihl: usize,
 }
 
 /// Contains the inner payload of an [`EthernetPdu`]
@@ -51,15 +53,37 @@ impl<'a> EthernetPdu<'a> {
         if buffer.len() < 14 {
             return Err(Error::Truncated);
         }
-        let pdu = EthernetPdu { buffer };
-        if pdu.tpid() == EtherType::DOT1Q && buffer.len() < 18 {
+        let pos = 12;
+        let ethertype = u16::from_be_bytes(buffer[pos..pos + 2].try_into().unwrap());
+        match ethertype {
+            EtherType::DOT1Q => Self::dot1q(buffer, pos + 2),
+            EtherType::QINQ => Self::qinq(buffer, pos + 2),
+            _ => Ok(EthernetPdu { buffer, ihl: 14 }),
+        }
+    }
+
+    fn dot1q(buffer: &'a [u8], pos: usize) -> Result<Self> {
+        // buffer needs the tag + ether len/tag
+        if buffer.len() < pos + 4 {
             return Err(Error::Truncated);
         }
-        if pdu.ethertype() < 0x0600 {
-            // we don't support 802.3 (LLC) frames
+
+        Ok(EthernetPdu { buffer, ihl: pos + 4 })
+    }
+
+    fn qinq(buffer: &'a [u8], mut pos: usize) -> Result<Self> {
+        // buffer needs to contain tag + dot1q tag
+        if buffer.len() < pos + 4 {
+            return Err(Error::Truncated);
+        }
+
+        pos += 2;
+        let ethertype = u16::from_be_bytes(buffer[pos..pos + 2].try_into().unwrap());
+        if ethertype != EtherType::DOT1Q {
             return Err(Error::Malformed);
         }
-        Ok(pdu)
+
+        Self::dot1q(buffer, pos + 2)
     }
 
     /// Returns a reference to the entire underlying buffer that was provided during construction
@@ -75,7 +99,7 @@ impl<'a> EthernetPdu<'a> {
 
     /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
-        self.clone().into_bytes()
+        (*self).into_bytes()
     }
 
     /// Consumes this object and returns the slice of the underlying buffer that contains the header part of this PDU
@@ -85,13 +109,13 @@ impl<'a> EthernetPdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Ethernet<'a>> {
-        self.clone().into_inner()
+        (*self).into_inner()
     }
 
     /// Consumes this object and returns an object representing the inner payload of this PDU
     pub fn into_inner(self) -> Result<Ethernet<'a>> {
         let rest = &self.buffer[self.computed_ihl()..];
-        Ok(match self.ethertype() {
+        Ok(match self.computed_ethertype() {
             EtherType::ARP => Ethernet::Arp(super::ArpPdu::new(rest)?),
             EtherType::IPV4 => Ethernet::Ipv4(super::Ipv4Pdu::new(rest)?),
             EtherType::IPV6 => Ethernet::Ipv6(super::Ipv6Pdu::new(rest)?),
@@ -100,10 +124,7 @@ impl<'a> EthernetPdu<'a> {
     }
 
     pub fn computed_ihl(&'a self) -> usize {
-        match self.tpid() {
-            EtherType::DOT1Q => 18,
-            _ => 14,
-        }
+        self.ihl
     }
 
     pub fn source_address(&'a self) -> [u8; 6] {
@@ -118,35 +139,59 @@ impl<'a> EthernetPdu<'a> {
         destination_address
     }
 
-    pub fn tpid(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[12..=13].try_into().unwrap())
-    }
-
     pub fn ethertype(&'a self) -> u16 {
-        match self.tpid() {
-            EtherType::DOT1Q => u16::from_be_bytes(self.buffer[16..=17].try_into().unwrap()),
-            ethertype => ethertype,
-        }
+        u16::from_be_bytes(self.buffer[12..14].try_into().unwrap())
     }
 
-    pub fn vlan(&'a self) -> Option<u16> {
-        match self.tpid() {
-            EtherType::DOT1Q => Some(u16::from_be_bytes(self.buffer[14..=15].try_into().unwrap()) & 0x0FFF),
+    pub fn computed_ethertype(&'a self) -> u16 {
+        u16::from_be_bytes(self.buffer[(self.ihl - 2)..self.ihl].try_into().unwrap())
+    }
+
+    pub fn vlan_tags(&'a self) -> Option<VlanTagIterator<'a>> {
+        match self.ethertype() {
+            EtherType::DOT1Q | EtherType::QINQ => Some(VlanTagIterator { buffer: self.buffer, pos: 12, eol: false }),
             _ => None,
         }
     }
+}
 
-    pub fn vlan_pcp(&'a self) -> Option<u8> {
-        match self.tpid() {
-            EtherType::DOT1Q => Some((self.buffer[14] & 0xE0) >> 5),
-            _ => None,
-        }
-    }
+/// Represents a VLAN tag
+#[derive(Debug, Copy, Clone)]
+pub struct VlanTag {
+    pub protocol_id: u16,
+    pub priority_codepoint: u8,
+    pub drop_eligible: bool,
+    pub id: u16,
+}
 
-    pub fn vlan_dei(&'a self) -> Option<bool> {
-        match self.tpid() {
-            EtherType::DOT1Q => Some(((self.buffer[14] & 0x10) >> 4) > 0),
-            _ => None,
+#[derive(Debug, Copy, Clone)]
+pub struct VlanTagIterator<'a> {
+    buffer: &'a [u8],
+    pos: usize,
+    eol: bool,
+}
+
+impl<'a> Iterator for VlanTagIterator<'a> {
+    type Item = VlanTag;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.eol {
+            return None;
         }
+        let tpid = u16::from_be_bytes(self.buffer[self.pos..self.pos + 2].try_into().unwrap());
+        if tpid != EtherType::DOT1Q && tpid != EtherType::QINQ {
+            return None;
+        }
+        if tpid == EtherType::DOT1Q {
+            self.eol = true;
+        }
+        let vlan_tag = VlanTag {
+            protocol_id: tpid,
+            priority_codepoint: (self.buffer[self.pos + 2] & 0xE0) >> 5,
+            drop_eligible: ((self.buffer[self.pos + 2] & 0x10) >> 4) > 0,
+            id: u16::from_be_bytes([self.buffer[self.pos + 2] & 0x0F, self.buffer[self.pos + 3]]),
+        };
+        self.pos += 4;
+        Some(vlan_tag)
     }
 }

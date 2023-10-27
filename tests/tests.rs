@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2019 Alex Forster <alex@alexforster.com>
+   Copyright (c) Alex Forster <alex@alexforster.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -26,10 +26,6 @@ use std::path;
 use std::process::{Command, Stdio};
 use std::result::Result;
 
-use base16;
-use pcap;
-use roxmltree as xml;
-
 fn hex_decode<T: ?Sized + AsRef<[u8]>>(length: usize, input: &T) -> Vec<u8> {
     let input = input.as_ref();
     let mut padding = Vec::new();
@@ -54,7 +50,9 @@ fn hex_decode<T: ?Sized + AsRef<[u8]>>(length: usize, input: &T) -> Vec<u8> {
     }
 }
 
-fn descendant_value(node: &xml::Node, proto: &str, field: &str, length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+fn descendant_value(
+    node: &roxmltree::Node, proto: &str, field: &str, length: usize,
+) -> Result<Vec<u8>, Box<dyn Error>> {
     let descendant = node.descendants().find(|n| n.attribute("name") == Some(format!("{}.{}", proto, field).as_str()));
     eprintln!("{}.{} = {:?}", proto, field, descendant);
     let descendant = if let Some(descendant) = descendant {
@@ -70,7 +68,7 @@ fn descendant_value(node: &xml::Node, proto: &str, field: &str, length: usize) -
     Ok(hex_decode(length, value))
 }
 
-fn descendant_show(node: &xml::Node, proto: &str, field: &str, length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
+fn descendant_show(node: &roxmltree::Node, proto: &str, field: &str, length: usize) -> Result<Vec<u8>, Box<dyn Error>> {
     let descendant = node.descendants().find(|n| n.attribute("name") == Some(format!("{}.{}", proto, field).as_str()));
     eprintln!("{}.{} = {:?}", proto, field, descendant);
     let descendant = if let Some(descendant) = descendant {
@@ -86,7 +84,7 @@ fn descendant_show(node: &xml::Node, proto: &str, field: &str, length: usize) ->
     Ok(hex_decode(length, value))
 }
 
-fn visit_ethernet_pdu(pdu: &EthernetPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_ethernet_pdu(pdu: &EthernetPdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -95,26 +93,38 @@ fn visit_ethernet_pdu(pdu: &EthernetPdu, mut nodes: VecDeque<xml::Node>) -> Resu
 
     assert_eq!(pdu.destination_address().as_ref(), descendant_value(&node, "eth", "dst", 6)?.as_slice());
     assert_eq!(pdu.source_address().as_ref(), descendant_value(&node, "eth", "src", 6)?.as_slice());
-    assert_eq!(&pdu.tpid().to_be_bytes(), descendant_value(&node, "eth", "type", 2)?.as_slice());
+    assert_eq!(&pdu.ethertype().to_be_bytes(), descendant_value(&node, "eth", "type", 2)?.as_slice());
 
-    if node.next_sibling_element().and_then(|sibling| sibling.attribute("name")) == Some("vlan") {
+    let mut vlan_count = 0;
+    for _ in node.next_siblings().take_while(|n| n.attribute("name") == Some("vlan")) {
+        vlan_count += 1;
+    }
+
+    let vlan_tags = pdu.vlan_tags();
+    let mut last_etype = None;
+    for _ in 0..vlan_count {
         let node = nodes.pop_front().unwrap();
         assert_eq!(node.attribute("name"), Some("vlan"));
-
-        assert_eq!(&pdu.vlan().unwrap().to_be_bytes(), descendant_value(&node, "vlan", "id", 2)?.as_slice());
-        assert_eq!(&pdu.vlan_pcp().unwrap().to_be_bytes(), descendant_value(&node, "vlan", "priority", 1)?.as_slice());
+        let vlan_tag = vlan_tags.unwrap().next().unwrap();
+        assert_eq!(&vlan_tag.protocol_id.to_be_bytes(), descendant_value(&node, "vlan", "etype", 1)?.as_slice());
+        last_etype = Some(vlan_tag.protocol_id.to_be_bytes());
         assert_eq!(
-            (pdu.vlan_dei().unwrap() as u8).to_be_bytes(),
-            descendant_value(&node, "vlan", "dei", 1)?.as_slice()
+            &vlan_tag.priority_codepoint.to_be_bytes(),
+            descendant_value(&node, "vlan", "priority", 1)?.as_slice()
         );
-        assert_eq!(&pdu.ethertype().to_be_bytes(), descendant_value(&node, "vlan", "etype", 2)?.as_slice());
-    } else {
-        assert_eq!(&pdu.ethertype().to_be_bytes(), descendant_value(&node, "eth", "type", 2)?.as_slice());
+        assert_eq!((vlan_tag.drop_eligible as u8).to_be_bytes(), descendant_value(&node, "vlan", "dei", 1)?.as_slice());
+    }
+
+    if let Some(last_etype) = last_etype {
+        assert_eq!(&last_etype, descendant_value(&node, "vlan", "id", 2)?.as_slice());
     }
 
     match pdu.inner() {
         Ok(ethernet) => match ethernet {
-            Ethernet::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
+            Ethernet::Raw(raw) => {
+                assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
+                Ok(())
+            }
             Ethernet::Arp(arp_pdu) => visit_arp_pdu(&arp_pdu, nodes),
             Ethernet::Ipv4(ipv4_pdu) => visit_ipv4_pdu(&ipv4_pdu, nodes),
             Ethernet::Ipv6(ipv6_pdu) => visit_ipv6_pdu(&ipv6_pdu, nodes),
@@ -123,7 +133,7 @@ fn visit_ethernet_pdu(pdu: &EthernetPdu, mut nodes: VecDeque<xml::Node>) -> Resu
     }
 }
 
-fn visit_arp_pdu(pdu: &ArpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_arp_pdu(pdu: &ArpPdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -143,7 +153,7 @@ fn visit_arp_pdu(pdu: &ArpPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box
     Ok(())
 }
 
-fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -151,7 +161,7 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     assert_eq!(node.attribute("name"), Some("ip"));
 
     assert_eq!(pdu.version().to_be_bytes(), descendant_value(&node, "ip", "version", 1)?.as_slice());
-    // wireshark 2.6 ip.hdr_len[value] is not correctly right-shifted by 4
+    // wireshark 3.2.3 ip.hdr_len[value] is not correctly right-shifted by 4
     //assert_eq!(pdu.ihl().to_be_bytes(), descendant_value(&node, "ip", "hdr_len", 1)?.as_slice());
     assert_eq!(pdu.dscp().to_be_bytes(), descendant_value(&node, "ip", "dsfield.dscp", 1)?.as_slice());
     assert_eq!(pdu.ecn().to_be_bytes(), descendant_value(&node, "ip", "dsfield.ecn", 1)?.as_slice());
@@ -159,7 +169,8 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     assert_eq!(pdu.identification().to_be_bytes(), descendant_value(&node, "ip", "id", 2)?.as_slice());
     assert_eq!((pdu.dont_fragment() as u8).to_be_bytes(), descendant_value(&node, "ip", "flags.df", 1)?.as_slice());
     assert_eq!((pdu.more_fragments() as u8).to_be_bytes(), descendant_value(&node, "ip", "flags.mf", 1)?.as_slice());
-    assert_eq!(pdu.fragment_offset().to_be_bytes(), descendant_value(&node, "ip", "frag_offset", 2)?.as_slice());
+    // wireshark 3.2.3 ip.frag_offset[value] is not correctly masked with 0x1FFF
+    //assert_eq!(pdu.fragment_offset().to_be_bytes(), descendant_value(&node, "ip", "frag_offset", 2)?.as_slice());
     assert_eq!(pdu.ttl().to_be_bytes(), descendant_value(&node, "ip", "ttl", 1)?.as_slice());
     assert_eq!(pdu.protocol().to_be_bytes(), descendant_value(&node, "ip", "proto", 1)?.as_slice());
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "ip", "checksum", 2)?.as_slice());
@@ -170,7 +181,7 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     assert_eq!(pdu.destination_address().as_ref(), descendant_value(&node, "ip", "dst", 4)?.as_slice());
 
     if let Some(options) = node.children().find(|n| n.attribute("name") == Some("")) {
-        let mut options = options.children().filter(|n| n.is_element()).collect::<VecDeque<xml::Node>>();
+        let mut options = options.children().filter(|n| n.is_element()).collect::<VecDeque<roxmltree::Node>>();
         for option in pdu.options() {
             let node = options.pop_front().unwrap();
             match option {
@@ -187,7 +198,10 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
 
     match pdu.inner() {
         Ok(ipv4) => match ipv4 {
-            Ipv4::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
+            Ipv4::Raw(raw) => {
+                assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
+                Ok(())
+            }
             Ipv4::Tcp(tcp_pdu) => visit_tcp_pdu(&tcp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv4(*pdu), nodes),
@@ -197,7 +211,7 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     }
 }
 
-fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -219,7 +233,7 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
             pdu.computed_identification().unwrap().to_be_bytes(),
             descendant_value(&fraghdr, "ipv6", "fraghdr.ident", 4)?.as_slice()
         );
-        // wireshark 2.6 ipv6.fraghdr.offset[value] is not correctly multiplied by 8
+        // wireshark 3.2.3 ipv6.fraghdr.offset[value] is not correctly multiplied by 8
         //assert_eq!(
         //    pdu.computed_fragment_offset().unwrap().to_be_bytes(),
         //    descendant_value(&fraghdr, "ipv6", "fraghdr.offset", 2)?.as_slice()
@@ -232,7 +246,10 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
 
     match pdu.inner() {
         Ok(ipv6) => match ipv6 {
-            Ipv6::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
+            Ipv6::Raw(raw) => {
+                assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
+                Ok(())
+            }
             Ipv6::Tcp(tcp_pdu) => visit_tcp_pdu(&tcp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv6(*pdu), nodes),
@@ -242,7 +259,7 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     }
 }
 
-fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -253,7 +270,7 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
     assert_eq!(pdu.destination_port().to_be_bytes(), descendant_value(&node, "tcp", "dstport", 2)?.as_slice());
     assert_eq!(pdu.sequence_number().to_be_bytes(), descendant_value(&node, "tcp", "seq", 4)?.as_slice());
     assert_eq!(pdu.acknowledgement_number().to_be_bytes(), descendant_value(&node, "tcp", "ack", 4)?.as_slice());
-    // wireshark 2.6 tcp.hdr_len[value] is not correctly right-shifted by 4
+    // wireshark 3.2.3 tcp.hdr_len[value] is not correctly right-shifted by 4
     //assert_eq!(pdu.data_offset().to_be_bytes(), descendant_value(&node, "tcp", "hdr_len", 1)?.as_slice());
     assert_eq!(pdu.flags().to_be_bytes(), descendant_value(&node, "tcp", "flags", 1)?.as_slice());
     assert_eq!((pdu.fin() as u8).to_be_bytes(), descendant_value(&node, "tcp", "flags.fin", 1)?.as_slice());
@@ -269,7 +286,7 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "tcp", "checksum", 2)?.as_slice());
     if descendant_show(&node, "tcp", "checksum.status", 1)?.eq(&[0x01]) {
         assert_eq!(
-            pdu.computed_checksum(&ip_pdu).to_be_bytes(),
+            pdu.computed_checksum(ip_pdu).to_be_bytes(),
             descendant_value(&node, "tcp", "checksum", 2)?.as_slice()
         );
     }
@@ -316,10 +333,10 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
             "tcp.options.sack" => {
                 if let Some(TcpOption::Sack { blocks }) = options.pop_front() {
                     match blocks {
-                        [Some((l, r)), None, None, None] |
-                        [Some((l, _)), Some((_, r)), None, None] |
-                        [Some((l, _)), Some((_, _)), Some((_, r)), None] |
-                        [Some((l, _)), Some((_, _)), Some((_, _)), Some((_, r))] => {
+                        [Some((l, r)), None, None, None]
+                        | [Some((l, _)), Some((_, r)), None, None]
+                        | [Some((l, _)), Some((_, _)), Some((_, r)), None]
+                        | [Some((l, _)), Some((_, _)), Some((_, _)), Some((_, r))] => {
                             assert_eq!(
                                 &l.to_be_bytes(),
                                 descendant_value(&node, "tcp", "options.sack_le", 4)?.as_slice()
@@ -355,10 +372,16 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
 
     assert!(options.is_empty());
 
-    Ok(())
+    match pdu.inner() {
+        Ok(Tcp::Raw(raw)) => {
+            assert_eq!(&pdu.buffer()[pdu.computed_data_offset()..], raw);
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
-fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -371,15 +394,21 @@ fn visit_udp_pdu(pdu: &UdpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, "udp", "checksum", 2)?.as_slice());
     if descendant_show(&node, "udp", "checksum.status", 1)?.eq(&[0x01]) {
         assert_eq!(
-            pdu.computed_checksum(&ip_pdu).to_be_bytes(),
+            pdu.computed_checksum(ip_pdu).to_be_bytes(),
             descendant_value(&node, "udp", "checksum", 2)?.as_slice()
         );
     }
 
-    Ok(())
+    match pdu.inner() {
+        Ok(Udp::Raw(raw)) => {
+            assert_eq!(&pdu.buffer()[pdu.computed_data_offset()..], raw);
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
-fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -396,15 +425,21 @@ fn visit_icmp_pdu(pdu: &IcmpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) ->
     assert_eq!(pdu.checksum().to_be_bytes(), descendant_value(&node, proto, "checksum", 2)?.as_slice());
     if descendant_show(&node, proto, "checksum.status", 1)?.eq(&[0x01]) {
         assert_eq!(
-            pdu.computed_checksum(&ip_pdu).to_be_bytes(),
+            pdu.computed_checksum(ip_pdu).to_be_bytes(),
             descendant_value(&node, proto, "checksum", 2)?.as_slice()
         );
     }
 
-    Ok(())
+    match pdu.inner() {
+        Ok(Icmp::Raw(raw)) => {
+            assert_eq!(&pdu.buffer()[pdu.computed_data_offset()..], raw);
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
-fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<roxmltree::Node>) -> Result<(), Box<dyn Error>> {
     let node = nodes.pop_front().unwrap();
     if node.attribute("name") == Some("_ws.malformed") {
         return Err("node: malformed".into());
@@ -437,7 +472,10 @@ fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box
 
     match pdu.inner() {
         Ok(gre) => match gre {
-            Gre::Raw(raw) => Ok(assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw)),
+            Gre::Raw(raw) => {
+                assert_eq!(&pdu.buffer()[pdu.computed_ihl()..], raw);
+                Ok(())
+            }
             Gre::Ethernet(ethernet_pdu) => visit_ethernet_pdu(&ethernet_pdu, nodes),
             Gre::Ipv4(ipv4_pdu) => visit_ipv4_pdu(&ipv4_pdu, nodes),
             Gre::Ipv6(ipv6_pdu) => visit_ipv6_pdu(&ipv6_pdu, nodes),
@@ -482,8 +520,8 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
         }
 
         let dissections = String::from_utf8(output.stdout)?;
-        let dissections = xml::Document::parse(dissections.as_str())?;
-        let dissections: Vec<xml::Node> =
+        let dissections = roxmltree::Document::parse(dissections.as_str())?;
+        let dissections: Vec<roxmltree::Node> =
             dissections.root().first_element_child().unwrap().children().filter(|n| n.is_element()).collect();
 
         let mut pcap = match pcap::Capture::from_file(&pcap_file) {
@@ -498,7 +536,7 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
         for dissection in dissections.iter() {
             let data = pcap.next().unwrap().data;
             i += 1;
-            let dissections: VecDeque<xml::Node> = dissection
+            let dissections: VecDeque<roxmltree::Node> = dissection
                 .children()
                 .filter(|n| n.is_element())
                 .skip(2)
@@ -513,7 +551,7 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
             eprintln!("{} (#{})", &pcap_file, i + 1);
             let first_layer = dissections.front().unwrap().attribute("name");
             if first_layer == Some("eth") {
-                match EthernetPdu::new(&data) {
+                match EthernetPdu::new(data) {
                     Ok(ethernet_pdu) => match visit_ethernet_pdu(&ethernet_pdu, dissections) {
                         Ok(()) => {}
                         Err(e) => {
@@ -527,7 +565,7 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
                     }
                 }
             } else if first_layer == Some("ip") || first_layer == Some("ipv6") {
-                match Ip::new(&data) {
+                match Ip::new(data) {
                     Ok(Ip::Ipv4(ipv4_pdu)) => match visit_ipv4_pdu(&ipv4_pdu, dissections) {
                         Ok(()) => {}
                         Err(e) => {

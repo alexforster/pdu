@@ -13,26 +13,26 @@ fi
 DOCKER="docker"
 
 ${DOCKER} build -t pdu-fuzz - <<'EOF'
-FROM ubuntu:bionic
-ENV LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+FROM ubuntu:focal
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 VOLUME /usr/local/src/pdu
 WORKDIR /usr/local/src/pdu
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
 RUN \
   export DEBIAN_FRONTEND=noninteractive; \
   apt-get -q update; \
-  apt-get -q install -y curl build-essential linux-headers-generic pkg-config binutils-dev libunwind-dev libpcap-dev tshark; \
+  apt-get -q install -y curl build-essential linux-headers-generic pkg-config binutils-dev libunwind-dev libblocksruntime-dev liblzma-dev libpcap-dev tshark; \
   apt-get -q clean autoclean;
-RUN \
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable; \
-  source $HOME/.cargo/env; \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable;
+RUN source $HOME/.cargo/env; \
   cargo install honggfuzz;
 ENTRYPOINT \
   mkdir -p /tmp/honggfuzz/$FUZZ_TARGET; \
   source $HOME/.cargo/env; \
   cd ./fuzz; \
-  RUSTFLAGS="-C link-dead-code" HFUZZ_RUN_ARGS="-t 5 -T --output /tmp/honggfuzz/$FUZZ_TARGET" cargo hfuzz run $FUZZ_TARGET
+  export RUSTFLAGS="-C link-dead-code"; \
+  export HFUZZ_RUN_ARGS="-t 5 -T --output /tmp/honggfuzz/$FUZZ_TARGET"; \
+  cargo hfuzz run $FUZZ_TARGET
 EOF
 
 if [ -z "$1" ]; then

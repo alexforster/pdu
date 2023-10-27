@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2019 Alex Forster <alex@alexforster.com>
+   Copyright (c) Alex Forster <alex@alexforster.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ impl<'a> IcmpPdu<'a> {
 
     /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
-        self.clone().into_bytes()
+        (*self).into_bytes()
     }
 
     /// Consumes this object and returns the slice of the underlying buffer that contains the header part of this PDU
@@ -64,7 +64,7 @@ impl<'a> IcmpPdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Icmp<'a>> {
-        self.clone().into_inner()
+        (*self).into_inner()
     }
 
     /// Consumes this object and returns an object representing the inner payload of this PDU
@@ -82,18 +82,18 @@ impl<'a> IcmpPdu<'a> {
     }
 
     pub fn checksum(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[2..4].try_into().unwrap())
     }
 
     pub fn computed_checksum(&'a self, ip: &crate::Ip) -> u16 {
         match ip {
-            crate::Ip::Ipv4(_) => util::checksum(&[&self.buffer[0..=1], &self.buffer[4..]]),
+            crate::Ip::Ipv4(_) => util::checksum(&[&self.buffer[0..2], &self.buffer[4..]]),
             crate::Ip::Ipv6(ipv6) => util::checksum(&[
-                &ipv6.source_address().as_ref(),
-                &ipv6.destination_address().as_ref(),
-                &(ipv6.payload_length() as u32).to_be_bytes().as_ref(),
-                &[0x0, 0x0, 0x0, ipv6.computed_protocol()].as_ref(),
-                &self.buffer[0..=1],
+                ipv6.source_address().as_ref(),
+                ipv6.destination_address().as_ref(),
+                (ipv6.payload_length() as u32).to_be_bytes().as_ref(),
+                [0x0, 0x0, 0x0, ipv6.computed_protocol()].as_ref(),
+                &self.buffer[0..2],
                 &self.buffer[4..],
             ]),
         }
@@ -106,5 +106,9 @@ impl<'a> IcmpPdu<'a> {
 
     pub fn computed_data_offset(&'a self) -> usize {
         4
+    }
+
+    pub fn rest(&'a self) -> &'a [u8] {
+        &self.buffer[4..8]
     }
 }

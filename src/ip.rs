@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2019 Alex Forster <alex@alexforster.com>
+   Copyright (c) Alex Forster <alex@alexforster.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -28,6 +28,10 @@ pub mod IpProto {
     pub const ICMP: u8 = 1;
     pub const ICMP6: u8 = 58;
     pub const GRE: u8 = 47;
+    pub const HOPOPTS: u8 = 0;
+    pub const ROUTING: u8 = 43;
+    pub const FRAGMENT: u8 = 44;
+    pub const DESTOPTS: u8 = 60;
 }
 
 /// Contains either an [`Ipv4Pdu`] or [`Ipv6Pdu`] depending on address family
@@ -96,7 +100,7 @@ impl<'a> Ipv4Pdu<'a> {
 
     /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
-        self.clone().into_bytes()
+        (*self).into_bytes()
     }
 
     /// Consumes this object and returns the slice of the underlying buffer that contains the header part of this PDU
@@ -106,7 +110,7 @@ impl<'a> Ipv4Pdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Ipv4<'a>> {
-        self.clone().into_inner()
+        (*self).into_inner()
     }
 
     /// Consumes this object and returns an object representing the inner payload of this PDU
@@ -153,11 +157,11 @@ impl<'a> Ipv4Pdu<'a> {
     }
 
     pub fn total_length(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[2..4].try_into().unwrap())
     }
 
     pub fn identification(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[4..=5].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[4..6].try_into().unwrap())
     }
 
     pub fn dont_fragment(&'a self) -> bool {
@@ -185,11 +189,11 @@ impl<'a> Ipv4Pdu<'a> {
     }
 
     pub fn checksum(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[10..=11].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[10..12].try_into().unwrap())
     }
 
     pub fn computed_checksum(&'a self) -> u16 {
-        util::checksum(&[&self.buffer[0..=9], &self.buffer[12..self.computed_ihl()]])
+        util::checksum(&[&self.buffer[0..10], &self.buffer[12..self.computed_ihl()]])
     }
 
     pub fn source_address(&'a self) -> [u8; 4] {
@@ -205,7 +209,7 @@ impl<'a> Ipv4Pdu<'a> {
     }
 
     pub fn options(&'a self) -> Ipv4OptionIterator<'a> {
-        Ipv4OptionIterator { buffer: &self.buffer, pos: 20, ihl: self.computed_ihl() }
+        Ipv4OptionIterator { buffer: self.buffer, pos: 20, ihl: self.computed_ihl() }
     }
 }
 
@@ -281,7 +285,7 @@ impl<'a> Ipv6Pdu<'a> {
         }
         let mut position = 40;
         let mut next_header = buffer[6];
-        while let 0 | 43 | 44 | 59 | 60 = next_header {
+        while let IpProto::HOPOPTS | IpProto::ROUTING | IpProto::FRAGMENT | IpProto::DESTOPTS = next_header {
             if buffer.len() <= (position + 1) {
                 return Err(Error::Truncated);
             }
@@ -310,7 +314,7 @@ impl<'a> Ipv6Pdu<'a> {
 
     /// Returns the slice of the underlying buffer that contains the header part of this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
-        self.clone().into_bytes()
+        (*self).into_bytes()
     }
 
     /// Consumes this object and returns the slice of the underlying buffer that contains the header part of this PDU
@@ -320,7 +324,7 @@ impl<'a> Ipv6Pdu<'a> {
 
     /// Returns an object representing the inner payload of this PDU
     pub fn inner(&'a self) -> Result<Ipv6<'a>> {
-        self.clone().into_inner()
+        (*self).into_inner()
     }
 
     /// Consumes this object and returns an object representing the inner payload of this PDU
@@ -363,7 +367,7 @@ impl<'a> Ipv6Pdu<'a> {
     }
 
     pub fn payload_length(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[4..=5].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[4..6].try_into().unwrap())
     }
 
     pub fn next_header(&'a self) -> u8 {
@@ -373,7 +377,7 @@ impl<'a> Ipv6Pdu<'a> {
     pub fn computed_ihl(&'a self) -> usize {
         let mut position = 40;
         let mut next_header = self.next_header();
-        while let 0 | 43 | 44 | 59 | 60 = next_header {
+        while let IpProto::HOPOPTS | IpProto::ROUTING | IpProto::FRAGMENT | IpProto::DESTOPTS = next_header {
             next_header = self.buffer[position];
             position += ((self.buffer[position + 1] as usize) + 1) * 8;
         }
@@ -383,7 +387,7 @@ impl<'a> Ipv6Pdu<'a> {
     pub fn computed_protocol(&'a self) -> u8 {
         let mut position = 40;
         let mut next_header = self.next_header();
-        while let 0 | 43 | 44 | 59 | 60 = next_header {
+        while let IpProto::HOPOPTS | IpProto::ROUTING | IpProto::FRAGMENT | IpProto::DESTOPTS = next_header {
             next_header = self.buffer[position];
             position += ((self.buffer[position + 1] as usize) + 1) * 8;
         }
@@ -456,7 +460,7 @@ impl<'a> Iterator for Ipv6ExtensionHeaderIterator<'a> {
     type Item = Ipv6ExtensionHeader<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let 0 | 43 | 44 | 59 | 60 = self.next_header {
+        if let IpProto::HOPOPTS | IpProto::ROUTING | IpProto::FRAGMENT | IpProto::DESTOPTS = self.next_header {
             let header = self.next_header;
             self.next_header = self.buffer[self.pos];
             let header_length = ((self.buffer[self.pos + 1] as usize) + 1) * 8;

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2019 Alex Forster <alex@alexforster.com>
+   Copyright (c) Alex Forster <alex@alexforster.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -19,38 +19,35 @@
 use pdu::*;
 
 pub fn fuzz(data: &[u8]) {
-    match UdpPdu::new(&data) {
-        Ok(udp_pdu) => {
-            udp_pdu.source_port();
-            udp_pdu.destination_port();
-            udp_pdu.length();
-            udp_pdu.checksum();
-            let ip = Ip::Ipv4(
-                Ipv4Pdu::new(&[
-                    0x45u8, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00,
-                ])
-                .unwrap(),
-            );
-            udp_pdu.computed_checksum(&ip);
-            let ip = Ip::Ipv6(
-                Ipv6Pdu::new(&[
-                    0x60u8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ])
-                .unwrap(),
-            );
-            udp_pdu.computed_checksum(&ip);
-        }
-        Err(_) => {}
+    if let Ok(udp_pdu) = UdpPdu::new(data) {
+        udp_pdu.source_port();
+        udp_pdu.destination_port();
+        udp_pdu.length();
+        udp_pdu.checksum();
+        let ip = Ip::Ipv4(
+            Ipv4Pdu::new(&[
+                0x45u8, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00,
+            ])
+            .unwrap(),
+        );
+        udp_pdu.computed_checksum(&ip);
+        let ip = Ip::Ipv6(
+            Ipv6Pdu::new(&[
+                0x60u8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ])
+            .unwrap(),
+        );
+        udp_pdu.computed_checksum(&ip);
     }
 }
 
 fn main() {
     loop {
         honggfuzz::fuzz!(|data: &[u8]| {
-            fuzz(&data);
+            fuzz(data);
         });
     }
 }

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2019 Alex Forster <alex@alexforster.com>
+   Copyright (c) Alex Forster <alex@alexforster.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -19,26 +19,23 @@
 use pdu::*;
 
 pub fn fuzz(data: &[u8]) {
-    match ArpPdu::new(&data) {
-        Ok(arp_pdu) => {
-            arp_pdu.hardware_type();
-            arp_pdu.protocol_type();
-            arp_pdu.hardware_length();
-            arp_pdu.protocol_length();
-            arp_pdu.opcode();
-            arp_pdu.sender_hardware_address();
-            arp_pdu.sender_protocol_address();
-            arp_pdu.target_hardware_address();
-            arp_pdu.target_protocol_address();
-        }
-        Err(_) => {}
+    if let Ok(arp_pdu) = ArpPdu::new(data) {
+        arp_pdu.hardware_type();
+        arp_pdu.protocol_type();
+        arp_pdu.hardware_length();
+        arp_pdu.protocol_length();
+        arp_pdu.opcode();
+        arp_pdu.sender_hardware_address();
+        arp_pdu.sender_protocol_address();
+        arp_pdu.target_hardware_address();
+        arp_pdu.target_protocol_address();
     }
 }
 
 fn main() {
     loop {
         honggfuzz::fuzz!(|data: &[u8]| {
-            fuzz(&data);
+            fuzz(data);
         });
     }
 }

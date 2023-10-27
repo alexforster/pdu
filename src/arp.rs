@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2019 Alex Forster <alex@alexforster.com>
+   Copyright (c) Alex Forster <alex@alexforster.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ impl<'a> ArpPdu<'a> {
 
     /// Returns the slice of the underlying buffer that contains this PDU
     pub fn as_bytes(&'a self) -> &'a [u8] {
-        self.clone().into_bytes()
+        (*self).into_bytes()
     }
 
     /// Consumes this object and returns the slice of the underlying buffer that contains this PDU
@@ -69,11 +69,11 @@ impl<'a> ArpPdu<'a> {
     }
 
     pub fn hardware_type(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[0..=1].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[0..2].try_into().unwrap())
     }
 
     pub fn protocol_type(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[2..=3].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[2..4].try_into().unwrap())
     }
 
     pub fn hardware_length(&'a self) -> u8 {
@@ -85,7 +85,7 @@ impl<'a> ArpPdu<'a> {
     }
 
     pub fn opcode(&'a self) -> u16 {
-        u16::from_be_bytes(self.buffer[6..=7].try_into().unwrap())
+        u16::from_be_bytes(self.buffer[6..8].try_into().unwrap())
     }
 
     pub fn sender_hardware_address(&'a self) -> [u8; 6] {

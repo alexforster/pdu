@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2019 Alex Forster <alex@alexforster.com>
+   Copyright (c) Alex Forster <alex@alexforster.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -19,24 +19,27 @@
 use pdu::*;
 
 pub fn fuzz(data: &[u8]) {
-    match EthernetPdu::new(&data) {
-        Ok(ethernet_pdu) => {
-            ethernet_pdu.computed_ihl();
-            ethernet_pdu.destination_address();
-            ethernet_pdu.source_address();
-            ethernet_pdu.ethertype();
-            ethernet_pdu.vlan();
-            ethernet_pdu.vlan_pcp();
-            ethernet_pdu.vlan_dei();
+    if let Ok(ethernet_pdu) = EthernetPdu::new(data) {
+        ethernet_pdu.computed_ihl();
+        ethernet_pdu.destination_address();
+        ethernet_pdu.source_address();
+        ethernet_pdu.ethertype();
+        ethernet_pdu.computed_ethertype();
+        if let Some(vlan_tags) = ethernet_pdu.vlan_tags() {
+            for vlan_tag in vlan_tags {
+                vlan_tag.protocol_id;
+                vlan_tag.priority_codepoint;
+                vlan_tag.drop_eligible;
+                vlan_tag.id;
+            }
         }
-        Err(_) => {}
     }
 }
 
 fn main() {
     loop {
         honggfuzz::fuzz!(|data: &[u8]| {
-            fuzz(&data);
+            fuzz(data);
         });
     }
 }
