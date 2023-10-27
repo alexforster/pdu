@@ -35,6 +35,7 @@ pub mod EtherType {
 #[derive(Debug, Copy, Clone)]
 pub struct EthernetPdu<'a> {
     buffer: &'a [u8],
+    ihl: usize,
 }
 
 /// Contains the inner payload of an [`EthernetPdu`]
@@ -49,25 +50,40 @@ pub enum Ethernet<'a> {
 impl<'a> EthernetPdu<'a> {
     /// Constructs an [`EthernetPdu`] backed by the provided `buffer`
     pub fn new(buffer: &'a [u8]) -> Result<Self> {
-        if buffer.len() < 12 {
+        if buffer.len() < 14 {
             return Err(Error::Truncated);
         }
-        let mut pos = 12;
-        loop {
-            if buffer.len() < pos + 2 {
-                return Err(Error::Truncated);
-            }
-            let ethertype = u16::from_be_bytes(buffer[pos..pos + 2].try_into().unwrap());
-            if ethertype != EtherType::DOT1Q && ethertype != EtherType::QINQ {
-                break;
-            }
-            if buffer.len() < pos + 4 {
-                return Err(Error::Truncated);
-            }
-            pos += 4;
+        let pos = 12;
+        let ethertype = u16::from_be_bytes(buffer[pos..pos + 2].try_into().unwrap());
+        match ethertype {
+            EtherType::DOT1Q => Self::dot1q(buffer, pos + 2),
+            EtherType::QINQ => Self::qinq(buffer, pos + 2),
+            _ => Ok(EthernetPdu { buffer, ihl: 14 }),
         }
-        let pdu = EthernetPdu { buffer };
-        Ok(pdu)
+    }
+
+    fn dot1q(buffer: &'a [u8], pos: usize) -> Result<Self> {
+        // buffer needs the tag + ether len/tag
+        if buffer.len() < pos + 4 {
+            return Err(Error::Truncated);
+        }
+
+        Ok(EthernetPdu { buffer, ihl: pos + 4 })
+    }
+
+    fn qinq(buffer: &'a [u8], mut pos: usize) -> Result<Self> {
+        // buffer needs to contain tag + dot1q tag
+        if buffer.len() < pos + 4 {
+            return Err(Error::Truncated);
+        }
+
+        pos += 2;
+        let ethertype = u16::from_be_bytes(buffer[pos..pos + 2].try_into().unwrap());
+        if ethertype != EtherType::DOT1Q {
+            return Err(Error::Malformed);
+        }
+
+        Self::dot1q(buffer, pos + 2)
     }
 
     /// Returns a reference to the entire underlying buffer that was provided during construction
@@ -108,22 +124,7 @@ impl<'a> EthernetPdu<'a> {
     }
 
     pub fn computed_ihl(&'a self) -> usize {
-        let mut pos = 12;
-        let mut first_iter = false;
-        loop {
-            let ethertype = u16::from_be_bytes(self.buffer[pos..pos + 2].try_into().unwrap());
-            if ethertype != EtherType::DOT1Q && ethertype != EtherType::QINQ {
-                if !first_iter {
-                    return pos + 2;
-                }
-                break
-            }
-            pos += 4;
-            if !first_iter {
-                first_iter = true
-            }
-        }
-        pos
+        self.ihl
     }
 
     pub fn source_address(&'a self) -> [u8; 6] {
@@ -143,14 +144,7 @@ impl<'a> EthernetPdu<'a> {
     }
 
     pub fn computed_ethertype(&'a self) -> u16 {
-        let mut pos = 12;
-        loop {
-            let ethertype = u16::from_be_bytes(self.buffer[pos..pos + 2].try_into().unwrap());
-            if ethertype != EtherType::DOT1Q && ethertype != EtherType::QINQ {
-                return ethertype;
-            }
-            pos += 4;
-        }
+        u16::from_be_bytes(self.buffer[(self.ihl - 2)..self.ihl].try_into().unwrap())
     }
 
     pub fn vlan_tags(&'a self) -> Option<VlanTagIterator<'a>> {
