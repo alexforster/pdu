@@ -41,6 +41,9 @@ pub use icmp::{Icmp, IcmpPdu};
 mod gre;
 pub use gre::{Gre, GrePdu};
 
+mod esp;
+pub use esp::{Esp, EspPdu};
+
 mod util;
 
 /// Defines the set of possible errors returned by packet parsers in this crate
