@@ -20,9 +20,9 @@ default = ["std"]
 std = []
 
 [dev-dependencies]
-base16 = { version = "~0.2" }
-roxmltree = { version = "~0.14", features = ["std"] }
-pcap = { version = "~0.9" }
+base16 = { version = "^0.2" }
+roxmltree = { version = "^0.21", features = ["std"] }
+pcap = { version = "^2" }
 
 [workspace]
 members = [

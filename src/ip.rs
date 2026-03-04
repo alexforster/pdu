@@ -28,6 +28,7 @@ pub mod IpProto {
     pub const ICMP: u8 = 1;
     pub const ICMP6: u8 = 58;
     pub const GRE: u8 = 47;
+    pub const ESP: u8 = 50;
 }
 
 /// Contains either an [`Ipv4Pdu`] or [`Ipv6Pdu`] depending on address family
@@ -65,6 +66,7 @@ pub enum Ipv4<'a> {
     Udp(super::UdpPdu<'a>),
     Icmp(super::IcmpPdu<'a>),
     Gre(super::GrePdu<'a>),
+    Esp(super::EspPdu<'a>),
 }
 
 impl<'a> Ipv4Pdu<'a> {
@@ -127,6 +129,7 @@ impl<'a> Ipv4Pdu<'a> {
                         Ipv4::Raw(rest)
                     }
                 }
+                IpProto::ESP => Ipv4::Esp(super::EspPdu::new(rest)?),
                 _ => Ipv4::Raw(rest),
             })
         }
@@ -267,6 +270,7 @@ pub enum Ipv6<'a> {
     Udp(super::UdpPdu<'a>),
     Icmp(super::IcmpPdu<'a>),
     Gre(super::GrePdu<'a>),
+    Esp(super::EspPdu<'a>),
 }
 
 impl<'a> Ipv6Pdu<'a> {
@@ -341,6 +345,7 @@ impl<'a> Ipv6Pdu<'a> {
                         Ipv6::Raw(rest)
                     }
                 }
+                IpProto::ESP => Ipv6::Esp(super::EspPdu::new(rest)?),
                 _ => Ipv6::Raw(rest),
             })
         }

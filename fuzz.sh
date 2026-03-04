@@ -13,7 +13,7 @@ fi
 DOCKER="docker"
 
 ${DOCKER} build -t pdu-fuzz - <<'EOF'
-FROM ubuntu:bionic
+FROM ubuntu:noble
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 VOLUME /usr/local/src/pdu
@@ -36,7 +36,7 @@ ENTRYPOINT \
 EOF
 
 if [ -z "$1" ]; then
-  echo "Usage: fuzz.sh [ clean | ethernet | arp | ipv4 | ipv6 | tcp | udp | icmp | gre ]"
+  echo "Usage: fuzz.sh [ clean | ethernet | esp | arp | ipv4 | ipv6 | tcp | udp | icmp | gre ]"
 fi
 
 ${DOCKER} run --init --rm -v "$(pwd):/usr/local/src/pdu" -e FUZZ_TARGET=$1 pdu-fuzz

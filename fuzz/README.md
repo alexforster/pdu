@@ -10,5 +10,5 @@ To fuzz this library, change into this working directory and then run...
 
 `RUSTFLAGS="-C link-dead-code" cargo hfuzz run <name>`
 
-...where *name* is one of `arp`, `ethernet`, `gre`, `icmp`, `ipv4`, `ipv6`,
+...where *name* is one of `arp`, `esp`, `ethernet`, `gre`, `icmp`, `ipv4`, `ipv6`,
 `tcp`, or `udp`.

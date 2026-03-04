@@ -150,8 +150,9 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     }
     assert_eq!(node.attribute("name"), Some("ip"));
 
-    assert_eq!(pdu.version().to_be_bytes(), descendant_value(&node, "ip", "version", 1)?.as_slice());
-    // wireshark 2.6 ip.hdr_len[value] is not correctly right-shifted by 4
+    // wireshark ip.version is not correctly masked and right-shifted by 4
+    //assert_eq!(pdu.version().to_be_bytes(), descendant_value(&node, "ip", "version", 1)?.as_slice());
+    // wireshark ip.hdr_len[value] is not correctly masked
     //assert_eq!(pdu.ihl().to_be_bytes(), descendant_value(&node, "ip", "hdr_len", 1)?.as_slice());
     assert_eq!(pdu.dscp().to_be_bytes(), descendant_value(&node, "ip", "dsfield.dscp", 1)?.as_slice());
     assert_eq!(pdu.ecn().to_be_bytes(), descendant_value(&node, "ip", "dsfield.ecn", 1)?.as_slice());
@@ -192,6 +193,7 @@ fn visit_ipv4_pdu(pdu: &Ipv4Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
             Ipv4::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv4(*pdu), nodes),
             Ipv4::Gre(gre_pdu) => visit_gre_pdu(&gre_pdu, nodes),
+            Ipv4::Esp(esp_pdu) => visit_esp_pdu(&esp_pdu, nodes),
         },
         Err(e) => Err(e.into()),
     }
@@ -204,7 +206,8 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
     }
     assert_eq!(node.attribute("name"), Some("ipv6"));
 
-    assert_eq!(pdu.version().to_be_bytes(), descendant_value(&node, "ipv6", "version", 1)?.as_slice());
+    // wireshark ipv6.version is not correctly masked and right-shifted by 4
+    //assert_eq!(pdu.version().to_be_bytes(), descendant_value(&node, "ipv6", "version", 1)?.as_slice());
     assert_eq!(pdu.dscp().to_be_bytes(), descendant_value(&node, "ipv6", "tclass.dscp", 1)?.as_slice());
     assert_eq!(pdu.ecn().to_be_bytes(), descendant_value(&node, "ipv6", "tclass.ecn", 1)?.as_slice());
     assert_eq!(pdu.flow_label().to_be_bytes(), descendant_value(&node, "ipv6", "flow", 4)?.as_slice());
@@ -237,6 +240,7 @@ fn visit_ipv6_pdu(pdu: &Ipv6Pdu, mut nodes: VecDeque<xml::Node>) -> Result<(), B
             Ipv6::Udp(udp_pdu) => visit_udp_pdu(&udp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Icmp(icmp_pdu) => visit_icmp_pdu(&icmp_pdu, &Ip::Ipv6(*pdu), nodes),
             Ipv6::Gre(gre_pdu) => visit_gre_pdu(&gre_pdu, nodes),
+            Ipv6::Esp(esp_pdu) => visit_esp_pdu(&esp_pdu, nodes),
         },
         Err(e) => Err(e.into()),
     }
@@ -316,10 +320,10 @@ fn visit_tcp_pdu(pdu: &TcpPdu, ip_pdu: &Ip, mut nodes: VecDeque<xml::Node>) -> R
             "tcp.options.sack" => {
                 if let Some(TcpOption::Sack { blocks }) = options.pop_front() {
                     match blocks {
-                        [Some((l, r)), None, None, None] |
-                        [Some((l, _)), Some((_, r)), None, None] |
-                        [Some((l, _)), Some((_, _)), Some((_, r)), None] |
-                        [Some((l, _)), Some((_, _)), Some((_, _)), Some((_, r))] => {
+                        [Some((l, r)), None, None, None]
+                        | [Some((l, _)), Some((_, r)), None, None]
+                        | [Some((l, _)), Some((_, _)), Some((_, r)), None]
+                        | [Some((l, _)), Some((_, _)), Some((_, _)), Some((_, r))] => {
                             assert_eq!(
                                 &l.to_be_bytes(),
                                 descendant_value(&node, "tcp", "options.sack_le", 4)?.as_slice()
@@ -446,6 +450,19 @@ fn visit_gre_pdu(pdu: &GrePdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box
     }
 }
 
+fn visit_esp_pdu(pdu: &EspPdu, mut nodes: VecDeque<xml::Node>) -> Result<(), Box<dyn Error>> {
+    let node = nodes.pop_front().unwrap();
+    if node.attribute("name") == Some("_ws.malformed") {
+        return Err("node: malformed".into());
+    }
+    assert_eq!(node.attribute("name"), Some("esp"));
+
+    assert_eq!(pdu.spi().to_be_bytes(), descendant_value(&node, "esp", "spi", 4)?.as_slice());
+    assert_eq!(pdu.sequence_number().to_be_bytes(), descendant_value(&node, "esp", "sequence", 4)?.as_slice());
+
+    Ok(())
+}
+
 #[test]
 fn test_pcaps() -> Result<(), Box<dyn Error>> {
     let crate_root = path::Path::new(env!("CARGO_MANIFEST_DIR")).to_owned();
@@ -496,7 +513,7 @@ fn test_pcaps() -> Result<(), Box<dyn Error>> {
 
         let mut i = -1isize;
         for dissection in dissections.iter() {
-            let data = pcap.next().unwrap().data;
+            let data = pcap.next_packet().unwrap().data;
             i += 1;
             let dissections: VecDeque<xml::Node> = dissection
                 .children()

@@ -3,7 +3,7 @@
 DOCKER="docker"
 
 ${DOCKER} build -t pdu-test - <<'EOF'
-FROM ubuntu:bionic
+FROM ubuntu:noble
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 VOLUME /usr/local/src/pdu

@@ -7,4 +7,4 @@ edition = "2018"
 
 [dependencies]
 pdu = { path = ".." }
-honggfuzz = { version = "~0.5" }
+honggfuzz = { version = "^0.5" }

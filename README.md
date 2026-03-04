@@ -11,39 +11,42 @@ Small, fast, and correct L2/L3/L4 packet parser.
 
 #### Small
 
- * Fully-featured `no_std` support
- * No Crate dependencies and no macros
- * Internet protocols only: application-layer protocols are out of scope
+* Fully-featured `no_std` support
+* No Crate dependencies and no macros
+* Internet protocols only: application-layer protocols are out of scope
 
 #### Fast
 
- * Lazy parsing: only the fields that you access are parsed
- * Zero-copy construction: no heap allocations are performed
+* Lazy parsing: only the fields that you access are parsed
+* Zero-copy construction: no heap allocations are performed
 
 #### Correct
 
- * Tested against [Wireshark](https://www.wireshark.org/docs/man-pages/tshark.html) to ensure all packet fields are parsed correctly
- * Fuzzed using [Honggfuzz](https://github.com/google/honggfuzz) to ensure invalid input does not cause panics
- * Does not use any `unsafe` code
+* Tested against [Wireshark](https://www.wireshark.org/docs/man-pages/tshark.html) to ensure all packet fields are
+  parsed correctly
+* Fuzzed using [Honggfuzz](https://github.com/google/honggfuzz) to ensure invalid input does not cause panics
+* Does not use any `unsafe` code
 
 ## Supported Protocols
 
 The following protocol hierarchy can be parsed with this library:
 
- * Ethernet (including vlan)
-   * ARP
-   * IPv4 (including options)
-     * TCP (including options)
-     * UDP
-     * ICMP
-     * GREv0
-       * ...Ethernet, IPv4, IPv6...
-   * IPv6 (including extension headers)
-     * TCP (including options)
-     * UDP
-     * ICMPv6
-     * GREv0
-       * ...Ethernet, IPv4, IPv6...
+* Ethernet (including vlan)
+    * ARP
+    * IPv4 (including options)
+        * TCP (including options)
+        * UDP
+        * ICMP
+        * GREv0
+            * ...Ethernet, IPv4, IPv6...
+        * ESP
+    * IPv6 (including extension headers)
+        * TCP (including options)
+        * UDP
+        * ICMPv6
+        * GREv0
+            * ...Ethernet, IPv4, IPv6...
+        * ESP
 
 In addition, unrecognized upper protocols are accessible as bytes via `Raw`
 enum variants.
@@ -72,7 +75,7 @@ fn main() {
         0x6d, 0x70, 0x6c, 0x65, 0x08, 0x07, 0x74, 0x65, 0x73, 0x74, 0x41, 0x70, 0x70, 0x08, 0x01, 0x31, 0x0a,
         0x04, 0x1e, 0xcc, 0xe2, 0x51,
     ];
-    
+
     match EthernetPdu::new(&packet) {
         Ok(ethernet_pdu) => {
             println!("[ethernet] destination_address: {:x?}", ethernet_pdu.destination_address().as_ref());
