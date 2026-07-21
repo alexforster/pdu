@@ -31,6 +31,26 @@ pub mod IpProto {
     pub const ESP: u8 = 50;
 }
 
+/// IPv6 Fragment extension header number (RFC 8200 §4.5)
+const IPV6_FRAGMENT_HEADER: u8 = 44;
+
+/// Returns the length, in octets, of the IPv6 extension header of type `header` whose second octet
+/// is `len_or_reserved`.
+///
+/// For most extension headers (Hop-by-Hop, Routing, Destination Options) the second octet is the
+/// "Hdr Ext Len" field, encoding the header length in 8-octet units minus one. The Fragment header
+/// (type 44) is special: it is a fixed 8 octets and its second octet is a *Reserved* field, not a
+/// length. Per RFC 8200 §4.5 the Reserved field is ignored on reception and must not influence the
+/// header length.
+#[inline]
+fn ipv6_ext_header_len(header: u8, len_or_reserved: u8) -> usize {
+    if header == IPV6_FRAGMENT_HEADER {
+        8
+    } else {
+        ((len_or_reserved as usize) + 1) * 8
+    }
+}
+
 /// Contains either an [`Ipv4Pdu`] or [`Ipv6Pdu`] depending on address family
 #[derive(Debug, Copy, Clone)]
 pub enum Ip<'a> {
@@ -289,8 +309,9 @@ impl<'a> Ipv6Pdu<'a> {
             if buffer.len() <= (position + 1) {
                 return Err(Error::Truncated);
             }
+            let header = next_header;
             next_header = buffer[position];
-            position += ((buffer[position + 1] as usize) + 1) * 8;
+            position += ipv6_ext_header_len(header, buffer[position + 1]);
         }
         if buffer.len() < position {
             return Err(Error::Truncated);
@@ -379,8 +400,9 @@ impl<'a> Ipv6Pdu<'a> {
         let mut position = 40;
         let mut next_header = self.next_header();
         while let 0 | 43 | 44 | 59 | 60 = next_header {
+            let header = next_header;
             next_header = self.buffer[position];
-            position += ((self.buffer[position + 1] as usize) + 1) * 8;
+            position += ipv6_ext_header_len(header, self.buffer[position + 1]);
         }
         position
     }
@@ -389,8 +411,9 @@ impl<'a> Ipv6Pdu<'a> {
         let mut position = 40;
         let mut next_header = self.next_header();
         while let 0 | 43 | 44 | 59 | 60 = next_header {
+            let header = next_header;
             next_header = self.buffer[position];
-            position += ((self.buffer[position + 1] as usize) + 1) * 8;
+            position += ipv6_ext_header_len(header, self.buffer[position + 1]);
         }
         next_header
     }
@@ -464,10 +487,10 @@ impl<'a> Iterator for Ipv6ExtensionHeaderIterator<'a> {
         if let 0 | 43 | 44 | 59 | 60 = self.next_header {
             let header = self.next_header;
             self.next_header = self.buffer[self.pos];
-            let header_length = ((self.buffer[self.pos + 1] as usize) + 1) * 8;
+            let header_length = ipv6_ext_header_len(header, self.buffer[self.pos + 1]);
             let pos = self.pos;
             self.pos += header_length;
-            if header == 44 && header_length == 8 {
+            if header == IPV6_FRAGMENT_HEADER {
                 let identification = u32::from_be_bytes([
                     self.buffer[pos + 4],
                     self.buffer[pos + 5],
@@ -482,6 +505,67 @@ impl<'a> Iterator for Ipv6ExtensionHeaderIterator<'a> {
             }
         } else {
             None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Builds an IPv6 packet carrying a single Fragment extension header (offset 0, no more
+    /// fragments) followed by a minimal TCP header. `reserved` sets the Fragment header's Reserved
+    /// octet, which RFC 8200 §4.5 requires receivers to ignore.
+    fn ipv6_frag_tcp(reserved: u8) -> Vec<u8> {
+        let mut pkt = vec![0u8; 68];
+        // IPv6 header
+        pkt[0] = 0x60; // version 6
+        pkt[4..6].copy_from_slice(&28u16.to_be_bytes()); // payload length: 8 (frag) + 20 (tcp)
+        pkt[6] = IPV6_FRAGMENT_HEADER; // next header = Fragment (44)
+        pkt[7] = 64; // hop limit
+
+        // Fragment header at offset 40
+        pkt[40] = IpProto::TCP; // next header = TCP (6)
+        pkt[41] = reserved; // Reserved octet — must not influence parsing
+        pkt[42..44].copy_from_slice(&0u16.to_be_bytes()); // fragment offset 0, M=0
+        pkt[44..48].copy_from_slice(&1u32.to_be_bytes()); // identification
+
+        // TCP header at offset 48
+        pkt[48..50].copy_from_slice(&8080u16.to_be_bytes()); // source port
+        pkt[50..52].copy_from_slice(&443u16.to_be_bytes()); // destination port
+        pkt[60] = 0x50; // data offset = 5 (20 bytes)
+        pkt[61] = 0x02; // SYN
+        pkt
+    }
+
+    fn assert_parses_as_tcp(pkt: &[u8]) {
+        let ipv6 = Ipv6Pdu::new(pkt).expect("IPv6 header should parse");
+        assert_eq!(ipv6.computed_protocol(), IpProto::TCP);
+        assert_eq!(ipv6.computed_ihl(), 48); // 40 (IPv6) + 8 (Fragment)
+        assert_eq!(ipv6.computed_fragment_offset(), Some(0));
+        assert_eq!(ipv6.computed_more_fragments(), Some(false));
+        match ipv6.into_inner().expect("inner payload should parse") {
+            Ipv6::Tcp(tcp) => {
+                assert_eq!(tcp.source_port(), 8080);
+                assert_eq!(tcp.destination_port(), 443);
+            }
+            other => panic!("expected Ipv6::Tcp, got {:?}", other),
+        }
+    }
+
+    /// A zero Reserved octet is the baseline: parsing must recognize the TCP payload.
+    #[test]
+    fn ipv6_fragment_header_zero_reserved_parses_tcp() {
+        assert_parses_as_tcp(&ipv6_frag_tcp(0x00));
+    }
+
+    /// A non-zero Fragment-header Reserved octet must be ignored (RFC 8200 §4.5) and must not change
+    /// how the header is parsed: the Fragment header is always 8 octets and the inner TCP payload
+    /// must still be recognized.
+    #[test]
+    fn ipv6_fragment_header_nonzero_reserved_still_parses_tcp() {
+        for reserved in [0x01u8, 0x07, 0x80, 0xff] {
+            assert_parses_as_tcp(&ipv6_frag_tcp(reserved));
         }
     }
 }
